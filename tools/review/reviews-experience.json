@@ -1,0 +1,527 @@
+[
+ {
+  "key": "art",
+  "review": {
+   "findings": [
+    {
+     "id": "art-1",
+     "title": "The MEGA BEAR strobes between its full art and a solid white silhouette 10 to 14 times a second under rapid fire",
+     "severity": "major",
+     "category": "photosensitivity-readability",
+     "files": [
+      "/Users/macbookair/game/src/level2_boss.js"
+     ],
+     "evidence": "Frames S/strobe/hmg-00400.png to hmg-00407.png (native 480x270, crop 230,60,250,190; S=/private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/shots/review-art), opened as S/sheets/strobe-hmg.png and on S/sheet-findings.png: the sequence is normal, white, white, normal, normal, normal, normal, white. The fixture W/fx/flashcount.js counts frames where e.hitT > 2 (the exact condition at level2_boss.js:737) from frame 300 to 900 (W=/private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/work/review-art). Results: H.M.G. 14.4 flashes/s, white on 49% of frames. Tractor machine gun 11.7/s (39%). Flame 9.7/s (32%). Pistol 4.4/s (14%). Rockets 2.0/s. Shotgun 0.8/s. The built /Users/macbookair/game/index.html gives the same 14.4/s. The boss covers 14.6k to 17.5k pixels, 11 to 13.5% of the screen (W/out/mask/all.json, m2-5720), and jumps from mean luminance 0.17 to white. For comparison, Mission 1's crab under the H.M.G. gives 1.8 flash onsets/s because it stays white, and the ROBO BEAR with the pistol gives 3.9/s. Cause: engine.js:338 sets hitT = 4 on every hit, and drawBear draws white only while hitT > 2, so the boss blinks once per bullet at the weapon's fire rate.",
+     "repro": "node H/harness.mjs render --level 2 --x 5921.6 --frames 905 --god --extra H/work/integrate/fx/fire-hmg.js --extra H/work/integrate/scn.js --extra W/fx/flashcount.js --out /tmp/x.png, then read the FLASH line on stderr. In real play: take the H from the dog at 5560, or keep the tractor (the bot rode it in the arena for 16 s in the seed 1 run) or the flame from the goat at 4600, then hold X at the MEGA BEAR.",
+     "impact": "This is the harshest thing on screen, right at the mission's climax. It breaks the three-flashes-per-second limit (WCAG 2.3.1) over a large area: at 3x full screen the boss is about 530x430 px, above the 341x256 small-area allowance. That is a photosensitivity risk for 8-10 year olds. It also hides the boss's warning signs (white eye flash before attacks, open jaw, laser-charging core) on up to half the frames.",
+     "suggestion": "In drawBear (level2_boss.js:737) replace `FLASH = e.hitT > 2;` with a rate-limited flash: `if (e.hitT >= 3 && G.t - (e.flashAt == null ? -99 : e.flashAt) >= 20) e.flashAt = G.t; FLASH = G.t - (e.flashAt == null ? -99 : e.flashAt) < 2;`. I checked this in a patched copy (W/flashfix.html, built with mkvariant.mjs and W/edits-flash.json). H.M.G. drops from 14.4 to 3.0 flashes/s and white frames from 49% to 10%. The tractor drops from 11.7 to 3.0/s and the pistol from 4.4 to 1.6/s. Boss hp at frame 900 is identical (323), so the change only affects drawing. Optional extra: draw the white copy at globalAlpha 0.6 over the art instead of replacing it. Sparks and sounds still mark every hit.",
+     "effort": "small",
+     "known": false
+    },
+    {
+     "id": "art-2",
+     "title": "The 'MEGA BEAR DOWN!' victory line is small 1x yellow text on the brightest part of the sky and hard to read",
+     "severity": "minor",
+     "category": "text-readability",
+     "files": [
+      "/Users/macbookair/game/src/level2_boss.js"
+     ],
+     "evidence": "S/boss/die-00416.png crop 290,60,130,40 (opened as S/sheets/z-bosstext2.png and on S/sheet-findings.png). The text sits at native x 308-402, y 79-90, over clouds (#fff6ec, luminance 0.93; #e3ded8, 0.74) and the white bridge cables. Its colour #ffe066 (luminance 0.75) gives a contrast of only about 1.0 to 1.25 against that background (lum.mjs on 300,60,130,16: mean luminance 0.655). In S/boss/die-00360.png it also sits under the 0.6 white screen flash. Cause: level2_boss.js:1012 adds it as a 1x floating text at e.y-130, which is in the sky.",
+     "repro": "node H/harness.mjs render --level 2 --x 5921.6 --frames 416 --god --extra H/work/integrate/fx/nob.js --extra H/work/integrate/scn.js --extra H/work/integrate/fx/b-die.js --extra H/work/boss/fx.js --out x.png",
+     "impact": "The payoff line of the whole mission is barely legible. Kids see explosions and then the win screen. Mission 1 had no such line, so this new idea doesn't land yet.",
+     "suggestion": "Show it as `G.big = { s: 'MEGA BEAR DOWN!', t: 120 }`, the 3x yellow text on the dark band used for MISSION START!, started about 25 frames after the 0.6 flash (through G.later). At minimum, use text(..., 2) on a dark panel at y \u2248 100 instead of in the sky.",
+     "effort": "small",
+     "known": false
+    },
+    {
+     "id": "art-3",
+     "title": "In the downpour the eagles' grey wings have the same brightness as the storm clouds",
+     "severity": "minor",
+     "category": "readability-rain",
+     "files": [
+      "/Users/macbookair/game/src/level2_enemies.js",
+      "/Users/macbookair/game/src/level2_sky.js"
+     ],
+     "evidence": "The mask fixture W/fx/mask.js draws each frame with and without the sprite and compares them (results in W/out/mask/all.json). Eagle body-versus-background contrast ratio in the rain: 1.09 (cam 3600), 1.18 (3750), 1.28 (3900). In sunny areas (cam 3000, 3150, 4650, 4950, 5250) it is 1.80 to 2.27. Median edge contrast is 2.85 to 2.94 in the rain against 7.4 to 9.4 in the sun. Colours from lum.mjs on S/m2/c3750-f200.png: eagle region 300,60,30,40 has #626b79 (luminance 0.145), #59616f (0.118), #505767 (0.095). The storm sky beside it (280,60,15,40) has #515969 (0.099), #5a6574 (0.127), #6c7684 (0.178). Crops: S/m2/c3750-f200.png at 270,45,80,80 against S/m2/c4650-f200.png at 135,125,80,60 (S/sheets/z-eagles.png).",
+     "repro": "node H/harness.mjs render --level 2 --x 3951.6 --frames 200 --god --extra H/work/integrate/fx/nob.js --extra H/work/integrate/scn.js --scale 3 --out x.png, then look at the diving eagle near 300,60.",
+     "impact": "In the 3500-4000 rain, including the 3500 lock with three eagles, an eagle reads only as a white head and gold feet. The wings and the dive silhouette vanish. The red aim line still warns of the dive, so the impact is limited.",
+     "suggestion": "When L2.weather().rain > 0.3, give the eagle wing tops a 1 px METL (#c3cdd8) leading edge and a lighter underside. Alternatively, brighten the storm-cloud band at eagle height (y 40-110) by about 15% in level2_sky.js. Target a body contrast of at least 1.6.",
+     "effort": "small",
+     "known": false
+    },
+    {
+     "id": "art-4",
+     "title": "Wolves blend into the bears' grey legs because both use the same metal colours",
+     "severity": "minor",
+     "category": "readability-enemy-separation",
+     "files": [
+      "/Users/macbookair/game/src/level2_enemies.js"
+     ],
+     "evidence": "In code, drawWolfLeg (level2_enemies.js:325) uses `c = near ? MET : METD` with METL highlights, and the bear drawLeg (level2_enemies.js:845) uses the same `c = near ? MET : METD` with METL highlights. Crops: S/play-n3/p-03810.png at 370,160,110,90 (a wolf in front of the ROBO BEAR, from a real bot run) and S/m2/c3600-f60.png at 375,160,105,90 (a wolf in front of a bear in the rain), opened as S/sheets/z-robobear.png. In the mask data, wolves at the ROBO BEAR lock have edge contrast 2.22 with 34% of edge pixels below 1.6 (m2-2250).",
+     "repro": "node H/harness.mjs render --level 2 --x 3801.6 --frames 60 --scale 3 --extra H/work/integrate/fx/nob.js --extra H/work/integrate/scn.js --out x.png, and look at the bear on the right with a wolf in front.",
+     "impact": "In the fights that mix bears and wolves (2250 ROBO BEAR lock, 3500 lock, spawns at 3380/3440 and 3960/4020), the fast pouncing wolf disappears into the slow bear's legs. Kids get hit by the wolf they didn't see.",
+     "suggestion": "Give wolves a distinct cooler, darker steel body (e.g. m '#7f93b4', d '#4c5b78', D '#30394d'), or give the bear and ROBO BEAR legs a warm dark tone (#6a5a50 / #4a3c34). Keep the cyan wolf lights.",
+     "effort": "small",
+     "known": false
+    },
+    {
+     "id": "art-5",
+     "title": "The ROBO BEAR's thrown logs are brown on brown when they cross the woods' tree trunks",
+     "severity": "polish",
+     "category": "readability-projectile",
+     "files": [
+      "/Users/macbookair/game/src/level2_enemies.js"
+     ],
+     "evidence": "S/rblog/r-00333.png crop 270,70,90,65, plus r-00321 to r-00357 and r-00726 to r-00771 (S/sheets/z-log-woods.png). The log colours #7a4f2a (luminance 0.099) and #a8744a (0.21) sit over trunk browns such as #8c8068 (0.22). In the mask data for cam 2250, the log's body contrast is 1.02 and its edge contrast 1.81. The colours are defined at level2_enemies.js:19 and the log is drawn at :1196-1222.",
+     "repro": "node W/cap.mjs cap --level 2 --x 2451.6 --god --frames 900 --every 3 --outdir out --prefix r --extra H/work/integrate/fx/nob.js --extra H/work/integrate/scn.js (logs are in the air at frames 309-363 and 717-771)",
+     "impact": "The outline and the cream end-ring keep the log visible, but it weakens noticeably while it crosses a trunk.",
+     "suggestion": "Lighten the log's top highlight (WDL \u2192 #c9925e) and make the end ring (RING) 2 px, or add a short dust trail. Alternatively, have the ROBO BEAR throw grey boulders in the woods.",
+     "effort": "small",
+     "known": false
+    },
+    {
+     "id": "art-6",
+     "title": "The Galician flag at x 2986 pops in at the right screen edge (the only real culling pop in the level)",
+     "severity": "polish",
+     "category": "popping",
+     "files": [
+      "/Users/macbookair/game/src/level2_world.js"
+     ],
+     "evidence": "Camera sweep W/fx/scan.js hashes all 2861 camera positions (0-5720, step 2) in the real build and in a copy with world culling disabled (W/nocull.html, built from W/edits-nocull.json). Frames differ only at cam 2486-2502, plus 1-3 px slivers at 4428, 4766-4768, 5090-5092 and 5628-5632. At cam 2494 the difference is native x 470-479, y 158-175: the cloth of DECOR [2, 2986, 'flag'] (level2_world.js:1536), culled by REACH flag [4, 30] (level2_world.js:1552) while it blows about 28 px left of its pole. Crops: S/pop/b-2494.png against S/pop/n-2494.png at 420,130,60,60 (S/sheets/z-pop.png).",
+     "repro": "node H/harness.mjs render --level 2 --x 201.6 --frames 1 --god --html W/base.html --extra W/fx/cam-2494.js --extra W/fx/camat.js --out a.png, then the same with --html W/nocull.html, then diff the two PNGs.",
+     "impact": "A 10x18 px piece of flag appears suddenly at the screen edge while scrolling. Tiny.",
+     "suggestion": "Set REACH.flag = [32, 30].",
+     "effort": "small",
+     "known": false
+    },
+    {
+     "id": "art-7",
+     "title": "Petals and butterflies are drawn over the animals' HELP! bubbles",
+     "severity": "polish",
+     "category": "z-order",
+     "files": [
+      "/Users/macbookair/game/src/screens.js",
+      "/Users/macbookair/game/src/level2.js",
+      "/Users/macbookair/game/src/level2_sky.js"
+     ],
+     "evidence": "S/m2/c5250-f200.png crop 280,170,70,60 (S/z/help-c5250.png): a butterfly covers the top of the H, so the bubble reads 'MELP!'. In drawPlay, the cages and their bubbles are drawn at screens.js:100 (bubble code at level2.js:538), and LV.drawOverlay with petals, butterflies and rain comes later at screens.js:110.",
+     "repro": "node H/harness.mjs render --level 2 --x 5451.6 --frames 200 --god --scale 3 --extra H/work/integrate/fx/nob.js --extra H/work/integrate/scn.js --out x.png",
+     "impact": "Now and then a speech bubble is partly covered and misread.",
+     "suggestion": "Draw the bubbles after LV.drawOverlay: drawTied collects the bubble rects, and the bubbles are drawn at the end of L2.drawOverlay. Alternatively, skip butterflies and petals inside the bubble rects.",
+     "effort": "small",
+     "known": false
+    },
+    {
+     "id": "art-8",
+     "title": "The trees are copy-pasted: identical chestnut canopies side by side and the same hollow trunk on every woods screen",
+     "severity": "polish",
+     "category": "repetition",
+     "files": [
+      "/Users/macbookair/game/src/level2_world.js"
+     ],
+     "evidence": "S/m2/c2250-f60.png crop 90,85,390,140 (on S/sheet-findings.png) shows three identical chestnut canopies (props at 2370, 2560, 2690) on one screen. All six chestnut props draw the same CHEST_TOP sprite, and all five cherry props draw the same CHERRY_TOP. The six 'huge' hollow trunks (DECOR at level2_world.js:1520) alternate between two sprites, so every woods frame in S/sheets/m2-f60-02.png and m2-f60-03.png shows the same hollow trunk.",
+     "repro": "node H/harness.mjs render --level 2 --x 2451.6 --frames 60 --scale 3 --extra H/work/integrate/fx/nob.js --extra H/work/integrate/scn.js --out x.png",
+     "impact": "Because the rest of the art is so detailed, the repeats stand out more than they did in Mission 1.",
+     "suggestion": "Mirror every other prop, choosing a pre-flipped copy with hsh(o.x). Vary canopy position and size by \u00b16 px. Add a third giant-trunk variant without the hollow.",
+     "effort": "small",
+     "known": false
+    },
+    {
+     "id": "art-9",
+     "title": "The boss's arm, jaw and torso pieces are rotated at any angle without smoothing, which breaks their pixel outlines",
+     "severity": "polish",
+     "category": "pixel-purity",
+     "files": [
+      "/Users/macbookair/game/src/level2_boss.js"
+     ],
+     "evidence": "S/boss/pound-00232.png crop 290,95,100,90, zoomed in S/z/boss-rear232.png: stair-stepped, broken 1 px outlines and doubled pixels on the forearm and paw. Cause: part() at level2_boss.js:600-606 calls ctx.rotate(ang) for any angle of 0.03 or more; the head and torso rotate at :630 and :664. The mouth is a canvas path fill (:636-637), which comes out anti-aliased. The broken outlines show most clearly on the white flash silhouette (frame 401 of art-1).",
+     "repro": "node W/cap.mjs cap --level 2 --x 5921.6 --god --frames 240 --at 232 --outdir out --prefix p --extra H/work/integrate/fx/nob.js --extra H/work/integrate/scn.js --extra H/work/integrate/fx/b-pound.js --extra H/work/boss/fx.js",
+     "impact": "Only visible up close or during the white flash. Children are unlikely to notice.",
+     "suggestion": "Snap part angles to 8-16 rotated copies made at load time, as weapons_extra.js does for rockets (ROCKET_ROT), and snap angles under 0.06 to 0. Draw the mouth from pixel rows, like the existing disc() helper.",
+     "effort": "large",
+     "known": false
+    },
+    {
+     "id": "art-10",
+     "title": "The soil changes colour along a vertical band at each area border",
+     "severity": "polish",
+     "category": "seam",
+     "files": [
+      "/Users/macbookair/game/src/level2_world.js"
+     ],
+     "evidence": "S/m2/c2700-f60.png crop 95,200,110,70, zoomed in S/z/seam2700.png, plus c1050 (x 1350) and c4200 (x 4400) in S/sheets/z-seams.png. The earth band switches palette across a \u00b116 px dither, because zoneAt (level2_world.js:164-168) uses j = (nz - 0.5) * 32.",
+     "repro": "node H/harness.mjs render --level 2 --x 2901.6 --frames 60 --scale 3 --out x.png and look at the ground near screen x 150.",
+     "impact": "A faint vertical stripe in the ground at x 1350, 2850 and 4400.",
+     "suggestion": "Widen the jitter to \u00b164 px (* 128), or blend the two palettes over about 120 px.",
+     "effort": "small",
+     "known": false
+    },
+    {
+     "id": "art-11",
+     "title": "K14 again, with new evidence: the tractor tilts on every orchard slope in normal play, not only on steep ones, and a one-number change fixes it",
+     "severity": "polish",
+     "category": "pixel-purity-vehicle",
+     "files": [
+      "/Users/macbookair/game/src/vehicle.js"
+     ],
+     "evidence": "tilt() at vehicle.js:367 tilts the tractor by 2\u00b0 (0.035 rad) whenever |rot| \u2265 0.025. Every slope the tractor can reach after x 2770 is at most 0.04 rad (terrain 4250-5050 rises or falls 6-8 px per 200 px), so it tilts across the whole orchard hill. S/tr/hill-00360.png crop 168,160,84,72 shows a stair-stepped canopy and hood and a distorted face. In a patched copy (W/tiltfix.html, vehicle.js threshold 0.025 \u2192 0.045), the same frame S/tr/tiltfix-00360.png is pixel-exact and the wheels still sit on the ground (S/sheets/z-tiltfix.png).",
+     "repro": "node W/cap.mjs cap --level 2 --x 4401.6 --god --frames 360 --at 360 --outdir out --prefix h --extra W/fx/tr-hill.js --extra H/work/integrate/scn.js",
+     "impact": "The tractor ride, probably the kids' favourite part, shows jagged art for about 10 s on every run.",
+     "suggestion": "Change the threshold in tilt() from 0.025 to 0.045 (2.6\u00b0). The tractor then never rotates in normal play, and a wheel lifts at most about 1 px.",
+     "effort": "small",
+     "known": true
+    },
+    {
+     "id": "art-12",
+     "title": "K3 again, with new evidence: the crossfade veil depends only on camera position (and Mission 1 has the same ghosting)",
+     "severity": "minor",
+     "category": "transition",
+     "files": [
+      "/Users/macbookair/game/src/level2_sky.js",
+      "/Users/macbookair/game/src/level2_world.js"
+     ],
+     "evidence": "weights() uses the camera centre with BOUNDS [1350, 2850, 4400] and FADE 150 (level2_sky.js:141-149). The veil is therefore shown whenever the camera is in 960-1260, 2460-2760 or 4010-4310, however long the player stays there: S/m2/c1050-f60.png and c1050-f200.png show the same veil 140 frames apart (crop 0,40,480,140). In bot runs the camera spends 1.5 s in the woods-entry band, 3.0 s in the woods-exit band and 3.5 s in the orchard band (logs S/play-n3/p-log.json and S/play-g1/p-log.json). Mission 1 shows the same ghost trunks at its camp boundary (S/m1/c1350-f60.png, S/sheets/trans-m1-m2.png), so this is not a regression.",
+     "repro": "node H/harness.mjs render --level 2 --x 1251.6 --frames 200 --scale 3 --out x.png",
+     "impact": "This is the most visible scenery glitch in normal play: three times per run, and longer if a child stops to fight inside a band.",
+     "suggestion": "Draw a solid front-layer 'gate' 120-160 px wide in drawFront at each boundary (two big trunks or a hedge arch at 1290-1410 and 2790-2910, a stone gate at 4340-4460) and cut FADE to about 70, so the blend happens behind the gate. For the woods, bring in the trunk layers with a vertical dither wipe instead of transparency.",
+     "effort": "medium",
+     "known": true
+    }
+   ],
+   "strengths": "Mission 2 is clearly better than Mission 1 in almost everything an 8-10 year old sees. At every one of the 40 Mission 2 camera positions the frame is richer than the matching Mission 1 frame. Fixes must not break the following.\n\n1. Mission 1 is untouched. Frames at x 400, 1950, 3350 and 4821.6 are pixel-identical to backup/index-before-level2.html, and the built index.html matches src for both missions (0 px difference).\n2. Scenery:\n   - Granite house with red tiles, a cat on the bench, an opening door, the h\u00f3rreo, and a fountain with a scallop shell.\n   - The R\u00eda with the C\u00edes Islands, Vigo, boats, seagulls and the Rande bridge.\n   - Woods with light shafts, squirrels, a waterfall and wading water.\n   - Farm with farmhouse, windmills, corn, vines, a scarecrow, Galician flags and puddles in the rain.\n   - Orchard with rainbow, petals, bees and hives.\n   - Galician signs (SOUTO, GRANXA, CEREIXAS).\n   - Every area has something moving.\n3. Culling is nearly perfect: across 2861 camera positions there is one visible pop (art-6).\n4. Readability holds up:\n   - Hero edge contrast is 2.3-7.1 in Mission 2 against 1.4-4.7 in Mission 1, for both Ines and Mathias.\n   - Outlines are consistent.\n   - The HUD reads cleanly for SHOTGUN, ROCKETS, FLAME, H.M.G. and the TRACTOR armour and shells, with no overlaps and 3-digit ammo fitting.\n   - Item boxes S, R and F are clear.\n5. Pixel discipline:\n   - Sprites are built from makeSprite, blob and paint with 1 px outlines.\n   - Rockets use 32 pre-rotated sprites.\n   - Logs and boulders use pre-drawn frames.\n   - Every weapon is drawn for level, up, crouch and jump-down aims.\n6. The intro is polished: letterbox, VIGO, GALICIA caption with flag, door opening and closing, WHAT A VIEW!, birds and eagles, then a clean hand-over to the HUD.\n7. Moments that feel good:\n   - Cage bursts: bars fly and the animal hops with hearts.\n   - Cherry and chestnut trees drop fruit.\n   - Splashes when wading.\n8. Weapons:\n   - Shotgun: blast cloud and pump.\n   - Rockets: smoke trail.\n   - Flame: stream.\n9. The tractor art is charming: boarding hop, GET IN!, BATTLE TRACTOR!, armour plates flying off, the wreck.\n10. MEGA BEAR:\n    - Huge, clear warnings: toss markers with '!', JUMP! hint, high and low laser lanes.\n    - WARNING entrance.\n    - Phase 2 with exposed glowing core.\n    - Death in several big explosions.\n11. Win screen with real stats from a real run: GREAT JOB, INES!, stars, SCORE 38400, ANIMALS RESCUED 7 / 7, TIME 4:20. Mathias: 33250, 7/7, 3:02.\n12. The VIGO HILLS mission card is good.",
+   "coverage": "WHERE MISSION 2 IS NOT YET CLEARLY BETTER THAN MISSION 1\n1. Boss-fight comfort: the MEGA BEAR strobes at 10-14 Hz, while Mission 1's crab goes steadily white (1.8 onsets/s) (art-1).\n2. The victory moment: the new MEGA BEAR DOWN! line is unreadable (art-2).\n3. Area transitions: same crossfade ghosting as Mission 1 (art-12, K3).\n4. The rain section: eagles there are weaker than Mission 1's drones, edge contrast about 2.9 against 3.9-7.3 (art-3).\n5. Repetition: identical tree props stand out more against the richer art (art-8).\n6. Wolf-plus-bear packs lose the wolf (art-4).\n\nRANKED CHANGES FOR THE BIGGEST VISUAL GAIN\n1. art-1: limit the boss flash to 3 per second (small; checked in a patched copy).\n2. art-12 / K3: front-layer gates over the three crossfade bands (medium).\n3. art-2: show MEGA BEAR DOWN! on the big dark band (small).\n4. art-11 / K14: set the tilt threshold to 0.045 so the tractor is always pixel-exact (small, one number).\n5. art-3 and art-4: rain-proof eagles; different colours for wolves and bear legs (small).\n6. art-8: mirror and vary the repeated trees (small).\n7. art-7, art-6, art-10: draw bubbles above the weather, widen the flag culling range, blend the soil (small each).\n8. Optional, outside my lens: a visible deflect effect when the tractor's half-damage bullets hit the boss (K4).\n\nWHAT I COVERED\nFolders: S=/private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/shots/review-art, W=/private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/work/review-art.\n1. Mission 2 render sweep: 40 camera positions (0-5700 step 150, plus 5720) at 60 and 200 frames, scale 3; plus 5 positions with Mathias.\n2. Mission 1: 32 positions at 60 frames and 16 at 200 frames.\n3. Intro: frames 1-460, the door sequence, and Mathias.\n4. Three captured bot playthroughs, every 30 frames, in W/cap.mjs (my multi-frame copy of the harness):\n   - Ines, seed 1: deaths, game over, continue from 4400, win.\n   - Ines, seed 1 again (a duplicate run).\n   - Mathias, seed 2: win.\n   - My --bot flag swallowed --god and --seed, so all three are real non-god runs, two of them seed 1.\n5. Lock fights at 900, 2250, 3500 and 5720, frames 200-900, plus the same locks in real play.\n6. Tractor: parked, boarding, uphill and downhill, cannon, gun up, wreck.\n7. Weapons: shotgun, rockets, flame and H.M.G., each level, up and crouched, in woods, rain and orchard; plus jump-and-aim-down.\n8. Rain fights, stream wading, three cage bursts, a cherry burst.\n9. Every boss phase: entrance, toss, pound, swipe, phase 2, high and low laser, roar, death.\n10. Screens: title, missions, select, pause, game over, continue, win, all clear.\n11. Close-ups at 4-8x.\n12. Sprite-versus-background contrast by drawing each frame with and without the sprite (W/fx/mask.js): hero, enemies and projectiles at 14 Mission 2 and 8 Mission 1 positions, both heroes.\n13. Culling scan of every camera position against a no-cull copy.\n14. Boss white-flash rates per weapon, compared with the crab and the ROBO BEAR.\n15. Whole-screen brightness trace of the boss death: only single flashes there.\n16. Two fixes tried in patched copies: art-1 and art-11.\n17. Findings sheet: S/sheet-findings.png, which I opened.\n\nNOT COVERED\n1. Audio (K7).\n2. Real Chrome rendering: every image comes from @napi-rs/canvas (Skia), so anti-aliasing of paths and gradients may differ slightly.\n3. Motion smoothness at 60 fps: I only saw frames sampled every 1-30 frames.\n4. Performance (K9).\n5. Every weapon against every enemy type.\n6. The egg-bomb on dark ground was not measured.\n7. Other agents' sheets were not used as evidence.\n\nI edited nothing under /Users/macbookair/game and never ran more than 3 renders at once.",
+   "sheet": "/private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/shots/review-art/sheet-findings.png"
+  }
+ },
+ {
+  "key": "kids",
+  "review": {
+   "findings": [
+    {
+     "id": "kids-1",
+     "title": "In the battle tractor the MEGA BEAR's swipe and HIGH laser cannot be avoided, yet the game tells the rider to DUCK!",
+     "severity": "major",
+     "category": "fairness",
+     "known": false,
+     "files": [
+      "src/level2_boss.js",
+      "src/vehicle.js"
+     ],
+     "evidence": "Lab /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/work/review-kids/lab-mb.js (output lab-mb.out in the same folder). E2, swipe in the tractor with the hero driving left rt frames after the tell: 'wall-0px rt0:HIT rt10:HIT rt15:HIT rt20:HIT | wall-10px rt0:HIT ... | wall-20px rt0:ok rt10:HIT rt15:HIT | wall-30px rt15:HIT'. On foot from 30 px every reaction time is 'ok'. E4: 'MB laser high IN TRACTOR | stand:HIT jump@cue:HIT' against 'on foot | crouch:ok'. E5 pound wave: hop windows in the tractor are 'hero 0 px from the wall: 48..50 (2 of 66 tried, step 2)' and '60 px: 60..70 (6)'; on foot they are '20..52 (17)'. 60 bot runs (out-a/, 20 seeds per bot): MB swipe against the tractor hit 51/51 (never-dodging), 70/70 (reacting + hops) and 86/86 (reacting walker); the walker on foot was hit 0/16. MB toss: 20/40 against the tractor, 0/28 on foot. For the walker the tractor blew up 33.5-36.0 s into the fight in 8/20 runs. Renders: shots/review-kids/tractor-laser-f366.png, game-pixel box (233,157)-(353,237), zoomed in crop-duck-tractor.png, shows 'DUCK!' and a down arrow over the seated hero with the aim line at chest height; tractor-laser-f392.png box (200,157)-(387,237), zoomed in crop-beam-tractor.png, shows the beam passing through the tractor. Code: drawHint (level2_boss.js:1152-1158) shows DUCK! whatever p.ride is; RIDES.tractor.box is a fixed 40 px tall (vehicle.js:790), so the beam at ground-33..-27 always overlaps it; \u2193+Z means getOut (vehicle.js:531). lab-fix.js: a rider who holds Down from frame 15 and taps Z at frame 25 'got out at laser frame 26', so obeying DUCK! throws the child out of the tractor.",
+     "repro": "render --level 2 --x 5921.6 --frames 366 --extra work/review-kids/rend-duck.js. Or play: ride the tractor into the orchard, drive up to the MEGA BEAR and hold X. Every second attack is a swipe that always hits. In phase 2 the HIGH laser shows DUCK!, but Down does nothing in the tractor and Down+Z ejects you.",
+     "impact": "A child does what the screen says and is still hit, or is thrown out of the tractor, which looks like a bug. The tractor loses armour on every attack with no counterplay and its gun does half damage (K4), so the favourite toy feels broken in the most important fight.",
+     "suggestion": "(1) level2_boss.js nextAttack(): when G.p.ride, never return 'swipe' (pick pound or toss). (2) vehicle.js: holding \u2193 without Z 'hunkers' the tractor. RIDES.tractor.box returns {y: p.y-26, h: 26}, so the HIGH beam (ground-33..-27) passes over, and seatHero draws the hero ducked. (3) drawHint: for a rider show 'HOLD DOWN!' for HIGH and 'HOP!' for LOW. (4) Optional: for a rider, mbwave hurts only below 5 px (the hop window then matches the 17-frame window on foot). A simpler alternative: park the tractor automatically at x 5600 ('TRACTOR PARKED!') so the boss is always fought on foot, which also removes K4.",
+     "effort": "medium"
+    },
+    {
+     "id": "kids-2",
+     "title": "On foot, the MEGA BEAR swipe cannot be dodged by a child pressed against the bear",
+     "severity": "major",
+     "category": "fairness",
+     "known": false,
+     "files": [
+      "src/level2_boss.js"
+     ],
+     "evidence": "The wall stops the hero at e.x-86 (level2_boss.js:1050), so a child holding \u2192 toward the boss sits at 0 px. The swipe zone is 50 px wide (REACH 136, level2_boss.js:157) and hurts from frame 35 (level2_boss.js:914), so escaping takes 50/1.7 = 29 frames of walking plus the reaction time. lab-mb.out E2 on foot: 'wall-0px rt0:ok rt10:HIT rt15:HIT rt20:HIT | wall-10px rt10:ok rt15:HIT rt20:HIT | wall-20px rt15:ok rt20:HIT | wall-30px all ok'. lab-fix.js on src: 'wall-0px rt10:HIT ... wall-5px all HIT, wall-15px rt15:HIT'. 60 bot runs, on-foot swipes with the hero \u226410 px from the wall: hit 15/26 (never-dodging) and 5/11 (reacting + hops); with the hero >20 px away the reacting bots were hit 0/22. Patched copy work/review-kids/variant-fix.html (REACH 120, damage frames 42-49), same lab: 'wall-0px rt10:ok rt15:ok rt20:ok rt25:HIT | wall-10px.. all ok'.",
+     "repro": "node harness.mjs sim --frames 1 --extra work/review-kids/lab-mb.js (prints the E2 table). In play: walk up to the MEGA BEAR until it blocks you and keep shooting. It growls, glints and swipes, and walking away after the glint is too late.",
+     "impact": "Going right up to the boss is what 8-10-year-olds do. The tell is a fair 0.58 s, but from the wall it can only be escaped with a ~0.1 s reaction, so the child loses a heart without understanding why.",
+     "suggestion": "level2_boss.js: REACH 136 \u2192 120, and shift the whole swipe timeline 7 frames later. In stepSwipe the growl stays at 1, glint 24\u219231, whoosh 35\u219242, damage frames 35-42 \u2192 42-49, sparks 39\u219246, end 70\u219277; shift every key of the rig 'swipe' case by +7 too. Measured with the patched copy: escapable from the wall with a reaction of up to 20 frames (0.33 s).",
+     "effort": "small"
+    },
+    {
+     "id": "kids-3",
+     "title": "The rocket launcher is never used: R is picked up inside the tractor ride and replaced by F before the hero gets out; the flame lasts only 6 s",
+     "severity": "major",
+     "category": "fun",
+     "known": false,
+     "files": [
+      "src/level2.js",
+      "src/weapons_extra.js",
+      "src/vehicle.js"
+     ],
+     "evidence": "The tractor is boarded at 2950 in 60/60 runs, and the bots ride it for 77-89 s per run (98-99% of the farm). The cow's R (level2.js:106, x 3200) was collected 20/20 per bot and the goat's F (x 4600) 20/20, both while riding. giveWeapon (engine.js:265-269) then replaces the 30 rockets with the flame. While riding, the HUD shows the tractor panel instead of the weapon (screens.js:41-42). Rockets were fired in 1 run out of 60 (hop-s18: 3 s, 15 damage). The flame is held 5.5-8.6 s per run and does 57-92 damage at the boss. lab-wp.js on held fire per pickup: flame 6.0 s (ammo 120, cd 3, weapons_extra.js:533), shotgun 12.0 s, rockets 15.0 s, HMG 13.3 s. Rockets themselves are strong: bear in 2.1 s (14 dps vs pistol 6.8), robobear in 3.6 s with 8 rockets.",
+     "repro": "node harness.mjs sim --level 2 --seed 1 --extra work/review-kids/kobs.js: the KO wpn lines list pistol, ride:tractor and flame, never rocket. In play: walk into the tractor, drive through the farm (you hear 'Rocket launcher!'), then 'Flame shot!' in the orchard; get out at the boss with the flame and no rockets.",
+     "impact": "One of the three new weapons the kids asked for is never experienced, although its voice line plays. The flame runs out in 6 s.",
+     "suggestion": "level2.js pows: give the pony at 2300 (inside the ROBO BEAR lock) the R and the cow at 3200 the B, so rockets are used on foot against the ROBO BEAR and the woods' wolves. weapons_extra.js: flame ammo 120 \u2192 240 (12 s, like the other weapons) and maxAmmo 200 \u2192 300. vehicle.js rideHud: draw the held weapon's icon next to TRACTOR, so a child sees what is waiting for them.",
+     "effort": "small"
+    },
+    {
+     "id": "kids-4",
+     "title": "K1 in practice: a walking child never gets the H before the boss, and half the time loses the pony's B; the S is fine",
+     "severity": "major",
+     "category": "learnability",
+     "known": true,
+     "files": [
+      "src/engine.js",
+      "src/level2.js"
+     ],
+     "evidence": "Item tracking in the 60 runs (work/review-kids/items.py out-a). The H from the dog at 5560 was collected 0/20 (reacting walker), 0/25 (never-dodging) and 2/20 (reacting + hops). It landed behind the hero in 15/15 walker runs, a median 125 px behind at screen x 62-77, and despawned a median 95 frames (1.6 s) after the drop as the camera moved on. Render shots/review-kids/item-H-behind-f161.png: the H crate sits at game px (55-68, 218-232) behind the hero at x\u2248202. Render log ri.out: drop at frame 127 at x 5549 with the hero already at 5618, landed at 5533 by frame ~155, off screen at frame ~200, gone at 215. The pony's B (2300, ROBO BEAR lock): the walker collected 11/20; the lost ones landed 134 px behind at screen x 67, stayed visible ~840 frames and vanished when the lock ended. New fact: the S from the dog at 560 lands 40 px IN FRONT of a child who shoots the cage from range, and the walking bot collected it 20/20. The hopping bots missed it 0/20 only because they jump over it, so that part of K1 is a bot artifact.",
+     "repro": "render --level 2 --x 5400 --frames 161 --extra work/review-kids/rend-item.js (the hero walks right through the dog's cage).",
+     "impact": "The heavy machine gun meant for the boss is lost by every child who walks into the cage and keeps going. The boss is then fought with the pistol for 60-75 s.",
+     "suggestion": "Toss the item to where the hero will be. In level2.js update(), use the integrator's mkedits 'toss' snippet: at salute frame 40 set it.vy = -3.4 and it.vx = clamp((p.x + p.vx*38 - it.x)/38, -4, 4). Or, in engine.js:525, drop toward the hero: dir = sign(p.x - o.x) || 1, dropItem(o.item, o.x + 10*dir, o.y - 14, dir).",
+     "effort": "small"
+    },
+    {
+     "id": "kids-5",
+     "title": "Wolf pounce: a quick reflex jump lands on the skidding wolf (the skid hurts for 8 frames); crouching never helps",
+     "severity": "minor",
+     "category": "fairness",
+     "known": false,
+     "files": [
+      "src/level2_enemies.js"
+     ],
+     "evidence": "lab-en.js E6 (hero standing, wolf crouching at 40/60/72 px): 'stand HIT, walk away ok, crouch HIT, safe jump start (crouch frame) 20..28 (5) / 20..34 (8) / 20..34 (8)' (step 2). lab-fix.js, every frame on src: '19..29 / 19..34 / 19..35'. Patched copy without the skid hurt (contact only 'pounce'/'run'): '10..29 / 10..34 / 10..35'. A jump 10-18 frames (0.17-0.3 s) after the crouch starts is therefore punished only by the skid clause at level2_enemies.js:511. 60 runs: wolf pounce is the top on-foot hit for the never-dodging bot (3.05/run) and for the reacting + hops bot, which jumps 15 frames after the crouch (2.5/run); 0.6/run for the walker. Running wolves also hurt on contact with no wind-up ('wolf run', 0-frame tell): 0.45-0.55 hits/run for the hopping bots.",
+     "repro": "node harness.mjs sim --frames 1 --extra work/review-kids/lab-fix.js, and the same with --html work/review-kids/variant-fix.html.",
+     "impact": "Kids learn 'jump over the wolf'. The fastest children, who jump the moment it crouches, come down on it and lose a heart.",
+     "suggestion": "level2_enemies.js:511: contact: e => e.state === 'pounce' || e.state === 'run' ? 'hurt' : 'none' (the skid no longer hurts). The safe jump window then starts at crouch frame 10 instead of 19. Optional: 'run' hurts only when e.spd > 1.5, so a wolf just starting to run does not bump the hero.",
+     "effort": "small"
+    },
+    {
+     "id": "kids-6",
+     "title": "ROBO BEAR charge: 'jump over it' is a 0.05-0.2 s window; only running away works",
+     "severity": "minor",
+     "category": "fairness",
+     "known": false,
+     "files": [
+      "src/level2_enemies.js"
+     ],
+     "evidence": "lab-en.js E1 (paw starts at frame 0, charge at 44, step 2). Robobear at 70/110/150 px: 'jump in place OK at paw frames 46..50 (3) / 58..62 (3) / 62..74 (7)', 'jump over (toward it) OK at 34..44 (6) / 46..58 (7) / 58..70 (7)'. The normal bear gets 6-11 and 12 windows. 'walk away ok' at every distance. The charge box is 48S\u00d730S = 60\u00d737.5 px (level2_enemies.js:1125, commented 'head down: jump over it!'). Patched copy variant-fix2.html with a 40S\u00d724S charge box: robobear in place 6/6/11 and over 11/12/12 (twice the window), bear in place 8/9/13 and over 13/15/15. Rerun of the walker with a better rock-dodge rule (walk2, 6 seeds): robobear charge became its top on-foot hit (0.5/run).",
+     "repro": "node harness.mjs sim --frames 1 --extra work/review-kids/lab-e1.js (src), and the same with --html work/review-kids/variant-fix2.html.",
+     "impact": "In the ROBO BEAR lock, with wolves arriving from both sides, a child who tries to jump the charging bear is almost always hit.",
+     "suggestion": "level2_enemies.js bearBox: while charging return { x: e.x - 20*S, y: e.y - 24*S, w: 40*S, h: 24*S } (standing shots at feet-19 still hit it).",
+     "effort": "small"
+    },
+    {
+     "id": "kids-7",
+     "title": "Tractor controls are never taught (\u2193+Z to get out, C cannon, \u2191 gun), and the 'JUMP!' text at the wreck means nothing",
+     "severity": "minor",
+     "category": "learnability",
+     "known": false,
+     "files": [
+      "src/vehicle.js",
+      "src/screens.js"
+     ],
+     "evidence": "The only tractor prompt is 'GET IN!' (vehicle.js:398-403). The exit \u2193+Z (vehicle.js:531) and the cannon on C are not shown anywhere. The pause screen lists only the on-foot controls (screens.js:419-421). Pressing Down then Z, for example to obey DUCK!, ejects the hero (lab-fix: 'got out at laser frame 26'). When the tractor is destroyed, 'JUMP!' appears (vehicle.js:684), but explode() calls blast(..., 'player') (vehicle.js:697), which never hurts the hero (engine.js:163-172). In 60 runs the bots rode 77-89 s per run, so the tractor is a large part of the mission.",
+     "repro": "Board the tractor and press P: no tractor controls are listed. Hold Down and tap Z: the hero hops out.",
+     "impact": "Children don't find the cannon and can't leave on purpose (so they never use their R or F, see kids-3). An accidental Down+Z drops them out mid-fight.",
+     "suggestion": "vehicle.js boardIt: add G.texts.push({x: o.x, y: gl.y - 70, s: 'C: CANNON   DOWN+Z: GET OUT', t: 160, c: '#ffffff'}). screens.js drawPause: when G.p.ride, add the line 'TRACTOR: X GUN (UP AIMS)  C CANNON  DOWN+Z OUT'. vehicle.js:684: change 'JUMP!' to 'BAIL OUT!'.",
+     "effort": "small"
+    },
+    {
+     "id": "kids-8",
+     "title": "K2 measured: a game over at the boss costs ~26-37 s of orchard on foot plus the whole fight again",
+     "severity": "minor",
+     "category": "frustration",
+     "known": true,
+     "files": [
+      "src/level2.js"
+     ],
+     "evidence": "Runs from the 4400 checkpoint (--x 4460, no tractor), out-a/cpw-s1..3 and cpb-s1..3 with the timeline fixture. Reaching the boss lock took 25.7-27.2 s for the reacting walker and 30.8-36.6 s for the never-dodging bot (1 death on the way in 1/3). The fight then restarts at 100% and lasts 73.5-75.0 s (reacting, pistol, no H) or 56.9-65.1 s. Never-dodging runs that needed continues: 6/20; with continues their boss phase lasted 133-320 s.",
+     "repro": "node harness.mjs sim --level 2 --x 4460 --seed 1 --extra work/review-kids/kobs.js --extra work/integrate/timeline.js",
+     "impact": "After a boss game over, the child replays half a minute of orchard before getting another try.",
+     "suggestion": "level2.js SECTIONS: add { x: 5450, name: 'THE BIG CHERRY TREES' }. loadLevel(5450) puts the hero at 5510, keeps the boss lock (5720 > cp), rebuilds the dog cage at 5560 (so a continue gets the H again) and spawns no robots (none spawn after 5300).",
+     "effort": "small"
+    },
+    {
+     "id": "kids-9",
+     "title": "Shotgun shells are wasted at range and the flame is gone in 6 s",
+     "severity": "minor",
+     "category": "fun",
+     "known": false,
+     "files": [
+      "src/weapons_extra.js"
+     ],
+     "evidence": "lab-wp.js. Shotgun: wolf at 40 px 1 shell (0.02 s), bear at 60 px 0.83 s (36 dps, 5x the pistol), but wolf at 150 px 'NO KILL (75 ammo)' and bear at 150 px no damage (pellet life 17, range ~90 px, weapons_extra.js:272). In the 20 walker runs the shotgun was held 17.5 s and all 30 shells did 20 damage (6.5 wolf kills), because a child, like the bot, holds X at anything on screen. Patched copy with pellet life 24: bear at 150 px 6.4 s (4.7 dps) instead of none. Flame: 6.0 s of held fire (weapons_extra.js:533).",
+     "repro": "node harness.mjs sim --frames 1 --extra work/review-kids/lab-wp.js",
+     "impact": "The S feels like it 'stops working' after a few seconds of firing at far wolves, and the F is over almost as soon as it is picked up.",
+     "suggestion": "weapons_extra.js:265 shotgun ammo 30 \u2192 40. weapons_extra.js:272 pellet life/max 17 \u2192 22 (range ~105 px). weapons_extra.js:533 flame ammo 120 \u2192 240 (12 s), maxAmmo 300.",
+     "effort": "small"
+    },
+    {
+     "id": "kids-10",
+     "title": "8-10 s with no robot on screen just before the MEGA BEAR",
+     "severity": "polish",
+     "category": "pacing",
+     "known": false,
+     "files": [
+      "src/level2.js"
+     ],
+     "evidence": "KO idle events (no active robot or enemy shot on screen for more than 8 s). The never-dodging bot hit one in 20/20 runs, 8.1-10.1 s, from x 4900-5200 to the boss lock at 5922 (the longer ones after continues, on foot). The reacting bots hit one in 9/40 runs (8.1-8.9 s, x 5000-5200 \u2192 5922). No other idle stretch longer than 8 s anywhere in the mission.",
+     "repro": "python3 work/review-kids/summ.py work/review-kids/out-a base walk (idle line).",
+     "impact": "A short lull right before the climax. Mostly fine, since the dog cage and cherry trees are there, but on foot after a continue it is ~10 s of walking.",
+     "suggestion": "Optional: level2.js spawns, move the eagle at 5300 to 5420 or add { t: 'wolf', x: 5450 }, so the quiet stretch is ~5 s.",
+     "effort": "small"
+    },
+    {
+     "id": "kids-11",
+     "title": "The 5.6 s Mission 2 intro can only be skipped with Enter and doesn't say so",
+     "severity": "polish",
+     "category": "learnability",
+     "known": false,
+     "files": [
+      "src/level2.js"
+     ],
+     "evidence": "level2.js:715 skips only on pressed.Enter. The intro is 338 frames (IT.end). The letterbox only shows 'VIGO, GALICIA'. Kids mash Z or X on menus, and both count as 'ok' elsewhere (core.js KEYMAP.ok).",
+     "repro": "Start Mission 2 and press Z or X during the cutscene: nothing happens.",
+     "impact": "A small wait on every new Mission 2 start, with no hint how to skip.",
+     "suggestion": "Draw 'ENTER: SKIP' in the bottom letterbox bar after the caption fades (t > 130).",
+     "effort": "small"
+    }
+   ],
+   "strengths": "On-screen tells: all 4,003 attack tells logged in 60 bot runs had the attacker on screen, and none of the 772 hits came from an attacker that was off screen when its tell started. Wind-ups are generous for kids: wolf pounce 26 frames, eagle dive 38 (aim line and reticle), egg 40 plus its fall, bear and robobear rear 39, paw/charge 44, throw 38 plus ~60 frames of flight, MEGA BEAR swipe 35, toss 41 (landing markers ~75 frames before impact), pound 54, lasers 54.\n\nReacting pays off: the never-dodging harness bot averaged 20.2 hits (median 15.5) with 30% of runs needing continues and 3.3 deaths. The reacting child with 0.25 s reactions averaged 10.9 hits with hops and 7.4 hits walking, 0/20 continues and 0.05 deaths. Only ~2 of the walker's 7.4 hits cost hearts; the rest are tractor armour at the boss.\n\nOn foot the MEGA BEAR is fair and readable as long as the child doesn't hug it. The walker took 0.1 on-foot hits per fight over 20 fights: lasers 0/30 (the DUCK!/JUMP! hints work, lab E4), rocks 0/28 (stepping 14 px off a marker is always safe, E3), waves 2/44. Fights last 49-64 s, inside the spec's 45-75 s.\n\nEagle dives, eggs, bear rears and boulders/logs are all avoidable by stepping away 0.25 s after the tell (labs E7, E8, E1b, E1c).\n\nCues kids can learn from: 'GET IN!' (tractor boarded in 60/60 runs), 'HELP!' cages (7/7 animals freed in every run), 'GO >' after each lock, pickup texts with voice lines, WARNING and the boss bar.\n\nMission 2 is not harder than Mission 1 for the same bot (Mission 1: 12/12 runs need continues, 9.4 hits/min in its hardest area). Its toughest stretches are the ROBO BEAR lock (5.9 hits/min never-dodging, 2.2 reacting) and the boss.\n\nAll 84 sims (src, identical to index.html) ended with errors [].\n\nThese must not break: the tell lengths, the DUCK!/JUMP! hints, the rock markers, and the boss's rests between attacks.",
+   "coverage": "Covered:\n- 84 headless sims (all errors []), in work/review-kids/out-a:\n  - Mission 2, seeds 1-20, three bots, with the observer kobs.js (logs attack tells, hit causes, items, idle stretches, weapon use): the never-dodging harness bot, the reacting child kreact.js with the harness hops, and the reacting child walking without hops (KIDS_HOP=false).\n  - Mission 1, seeds 1-12, the same observer, never-dodging bot.\n  - 3+3 continue-cost runs from x 4460.\n  - 6 runs of kreact2.js (better rock-dodge direction).\n- Controlled labs on the real code (lab-mb.js, lab-en.js, lab-wp.js, lab-fix.js, lab-e1.js): every MEGA BEAR attack on foot and in the tractor, wolf, eagle, egg, bear and robobear attacks with reaction times, and a weapon time-to-kill/dps table.\n- Before/after tests on patched copies built with mkvariant (variant-fix.html: REACH 120 + swipe damage frames 42-49 + wolf skid not hurting; variant-fix2.html: lower charge box + pellet life 24).\n- 6 renders in shots/review-kids, opened and cropped: DUCK! over the tractor, the beam through the tractor, the H left behind.\n- Checked: index.html contains all 15 src files verbatim, so the src sims represent the built file.\n\nNot covered:\n- Audio by ear (K7).\n- Real keyboard play in a browser: the Browser pane is reserved for the flow reviewer.\n- Hero 1 runs: heroes are cosmetic in the code.\n- A reacting bot for Mission 1: the rules are Mission 2 specific, so Mission 1 has only the never-dodging comparison.\n- Whether children notice or collect cherries and chestnuts: not measured.\n- A tractor rock-dodge lab: only the batch rate, 20/40 hits.\n- 'Too scary': judged only from code and renders (tremors, WARNING, a roar and up to 14 px screen shake, comparable to Mission 1's crab; no finding).\n\nCaveats:\n- The bots' reactions are idealised (exact 15-frame delay, perfect execution). Real 8-10-year-olds will take more hits, so treat the reacting numbers as a lower bound.\n- The harness bot's constant hopping (airborne ~90% of the time) distorts item pickups and some hits.",
+   "sheet": "Telegraph table (60 runs, all tells on screen; window = frames from tell to first hurt frame): wolf pounce 26 (reflex-jump safe window starts at frame 19; walking away always works) | wolf run contact 0 (hit rate 0-3%) | eagle dive 38 (step away: ok; jump/crouch: hit) | egg 40 + fall (step away: ok) | bear/robobear swipe 39 (back off: ok) | charge 44 (walk away: ok; jump-in-place window bear 6-11 / robobear 3-7 frames) | throw 38 + ~60 flight (step out: ok) | MB swipe 35 (from the wall: unavoidable with a reaction of 10+ frames; tractor 207/207 hit) | MB toss 41 (markers 75 frames before landing; stepping 14 px off is safe; tractor 50% hit) | MB pound 54 (jump window 32 frames on foot, 2-6 frames in the tractor) | MB lasers 54 (on foot crouch/jump ok; HIGH unavoidable in the tractor). Hits by bot over 20 seeds: never-dodging 20.2 (30% continue), reacting + hops 10.9 (0%), reacting walker 7.4 (0%). Area hits per minute on foot, never-dodging \u2192 walker: home 2.05 \u2192 0.28, woods 5.93 \u2192 2.24, farm (in the tractor, all hits per minute) 2.04 \u2192 0.99, orchard + boss 6.79 \u2192 0.18 (plus 5.4 tractor hits). Mission 1 never-dodging: 1.5 / 5.8 / 9.4 / 7.3, 12/12 runs need continues."
+  }
+ },
+ {
+  "key": "audio",
+  "review": {
+   "findings": [
+    {
+     "id": "audio-1",
+     "category": "sound-design",
+     "title": "The flamethrower is almost silent while you hold fire",
+     "severity": "minor",
+     "known": false,
+     "files": [
+      "src/weapons_extra.js"
+     ],
+     "evidence": "Code: src/weapons_extra.js:543 plays the start whoosh only when the flame has been off for more than 12 frames: `if (G.t - flameT > 12) { Snd.noise(0.35, 0.2, 700); Snd.tone('sine', 95, 60, 0.25, 0.16); }`. Line 544 is the only sound while the flame is held: `if (G.t - hissT >= 9) { hissT = G.t; Snd.noise(0.2, 0.08, 1800); }`.\n\nMeasurement (H/work/review-audio/weaponloud.mjs): I took the 3 s window with the most fire sounds in each weapon sandbox and rendered only that weapon's own fire sounds through the audio.js graph. Sustained loudness: flame -46.6 LUFS, pistol -40.8, H gun -40.1, tractor gun -41.1, rocket launches -36.2, shotgun -31.4. The vigo music measures -38.0 LUFS, so the held flame sits 8.6 LU under the music. On the laptop-speaker model it is -51.2 against the music's -45.3.\n\nIsolated sounds (sfxstats.mjs): FL hiss -56.1 LUFS-M; FL whoosh -41.5 LUFS-M, falling to -52.4 on the laptop model because almost all of its energy is below 200 Hz. Picture: H/shots/review-audio/crop-quiet-tiles.png, cut from sheet-sfx-m2-part4.png with box x0 y780 w640 h400. The FL hiss tile is almost empty.\n\nFix test (flamefix.mjs): one Snd.noise(0.3, 0.25, 1500) every 6 frames gives -39.5 LUFS sustained (laptop model -40.3).",
+     "repro": "node H/harness.mjs sim --sandbox wolf,wolf,wolf --god --frames 2400 --seed 1 --extra H/work/review-audio/sndlog.js --extra H/work/review-audio/fx/arm-flame.js 2> fl.log. Then in H/work/review-audio run: node weaponloud.mjs; node flamefix.mjs. In the game: pick up the F in the orchard and hold X. You hear one low whoosh, then almost nothing while the flames pour out.",
+     "impact": "The flame is the last new weapon before the MEGA BEAR. A child holding fire hears a short thump and then near silence under the music, so the weapon feels weak and broken compared with the loud shotgun and rockets.",
+     "suggestion": "In src/weapons_extra.js:544, replace the hiss with `if (G.t - hissT >= 6) { hissT = G.t; Snd.noise(0.3, 0.25, 1500); }`. Measured result: -39.5 LUFS sustained, about the H gun (-40.1), +7 LU over now. Optionally give the start whoosh at line 543 a mid layer, e.g. add `Snd.noise(0.3, 0.15, 2000)`, so it survives laptop speakers.",
+     "effort": "small"
+    },
+    {
+     "id": "audio-2",
+     "category": "mix-balance",
+     "title": "Rescued animals' calls (BAA / MOO / NEIGH / MEEEH) are buried in the mix",
+     "severity": "minor",
+     "known": false,
+     "files": [
+      "src/level2.js",
+      "src/audio.js"
+     ],
+     "evidence": "Code: src/level2.js:450-455. Sheep, pony and goat are sawtooth at vol 0.045 / 0.04 / 0.045; cow 0.07 + 0.04; dog square 0.09; hen 0.06. They are played 0.36 s after the cage bursts (level2.js:642).\n\nIsolated loudness (sfxstats.mjs): sheep -48.0 LUFS-M, pony -48.1, goat -48.1, hen -43, dog -42.1, cow -39.8. For comparison, the freed jingle is -40.3 and the music about -36 momentary.\n\nAt the real rescue moments (callmask.mjs, seed 1) I compared the call alone with everything else playing in the same window, in the call's own 1/3-octave bands:\n- sheep -15.1 dB (louder in 1/9 bands)\n- cow -15.8 dB (0/10)\n- goat -6.3 dB (1/8)\n- dog -3.2 dB\n- pony +1.0 dB\n- hen +8.5 dB\nIn seed 3: sheep -8.5, pony -12.8, goat -11.7 dB.\n\nAcross 5 runs (cues.mjs) the animal-call median is -8.6 dB and only 31% of 35 calls are above the rest. The freed jingle is at +6.4 dB, above the rest 91% of the time.\n\nPictures: H/shots/review-audio/spec-sheep-call-only.png shows 7 clear bleat pulses around 450 Hz at 0.5-0.95 s. spec-sheep-rescue-mix.png is the same 28.0-29.4 s window with everything playing: there they are lost under a boom, a wolf-howl line at 550-600 Hz and eagle screeches.\n\nFix test (callmask-fix.mjs): with the calls about x3 louder they measure -39 LUFS-M. In calmer rescues they then rise above the rest (pony +9.8, goat +2.5, sheep -0.4, hen +10.6 dB). In the busiest moments they stay buried: sheep under a howl and a boom -7.6 dB, cow under 20 tractor shots -9.5 dB. Ducking the music by 6 dB did not change those two (callmask-fixduck.mjs).",
+     "repro": "cd H/work/review-audio; node callmask.mjs logs/l2s1.err; node cues.mjs logs/l2s*.err. Listen to wav/win-sheep-rescue-mix.wav (window.mjs logs/l2s1.err 28.0 29.4).",
+     "impact": "Freeing the animals is a feature the family chose. The screen says BAA!, MOO!, NEIGH!, but at most rescues the child hears only the generic jingle and pop, not the animal.",
+     "suggestion": "1. In src/level2.js:450-455 raise the calls about 9 dB:\n   - sheep, goat 0.045 -> 0.13; pony 0.04 -> 0.12\n   - cow 0.07 / 0.04 / 0.05 / 0.03 -> 0.15 / 0.09 / 0.11 / 0.07\n   - dog tones 0.09 -> 0.14 and its noise 0.06 -> 0.1\n   - hen 0.06 -> 0.08\n   Measured: -39 LUFS-M, the level of the freed jingle.\n2. So the call is heard even in the middle of a fight, also speak the thanks word, as Mission 1's prisoners say 'Thank you!'. In onFree (level2.js:642) add `say(K.thanks.replace(/!/g, ''), 1.5, 1.1)`. Speech plays on top of the game mix.",
+     "effort": "small"
+    },
+    {
+     "id": "audio-3",
+     "category": "gameplay-audio",
+     "title": "Attack warning sounds are drowned out: wolf growl, eagle dive, MEGA BEAR toss / pound / roar wind-ups",
+     "severity": "minor",
+     "known": false,
+     "files": [
+      "src/level2_enemies.js",
+      "src/level2_boss.js"
+     ],
+     "evidence": "Code:\n- wolf growl before the pounce: level2_enemies.js:235 (`Snd.tone('sawtooth', 92, 66, 0.5, 0.08); Snd.tone('square', 46, 40, 0.5, 0.04); Snd.noise(0.45, 0.07, 420)`), triggered at :451\n- eagle dive: :705 (`Snd.tone('sawtooth', 1500, 500, 0.3, 0.04)`)\n- MEGA BEAR toss grunt: level2_boss.js:756 / :877\n- pound rise: :760 / :903\n- growl: :758\n- laser whine: :764\n\ncues.mjs compares each warning sound with everything else playing at the same moment, in the sound's own bands, over 5 seeded runs. Median dB, then the share of instances where the warning is louder than the rest:\n- wolf growl -10.3, 0/59\n- eagle dive -5.8, 0/44\n- MB grunt -9.3, 0/12\n- MB rise -8.8, 0/14\n- MB growl -10.0, 0/37\n- MB laser whine -7.7, 0/6\nThe egg beep (+7.1), eagle screech (+1.4) and laser charge (-0.1) are the cues that do get through.\n\nEven with the hero's own gunfire, hits and kill booms removed (cues-nofire.mjs), the wolf growl stays at -9.5 dB, MB grunt -8.7, rise -7.7, growl -7.4. Their energy sits at 46-160 Hz, where the music's bass and kick are loudest (cuefix2.mjs against the music alone: wolf growl -9.3 dB).\n\nFix test (cuefixC.mjs, same moments, rest without / with gunfire):\n- eagle dive -5.9 -> +0.7 / -12.8 -> -5.6\n- wolf growl -10.4 -> -1.8 / -11.6 -> -5.2\n- MB grunt -10.8 -> -5.1 / -11.6 -> -5.9\n- MB rise -9.5 -> -1.0 / -10.6 -> -2.8\n- MB growl -8.7 -> -2.5 / -12.1 -> -3.4",
+     "repro": "cd H/work/review-audio; node cues.mjs logs/l2s1.err logs/l2s2h1.err logs/l2s3.err logs/l2s4h1.err logs/l2s5.err; node cues-nofire.mjs (same logs); node cuefixC.mjs (same logs), and again with ALLFIRE=1.",
+     "impact": "The game shows these attacks with pictures, but the sounds meant to warn of a wolf pounce, an eagle dive or the MEGA BEAR's rock toss and ground pound cannot be heard. Eagles cause 1-4 hits per bot run (integrator timelines, TL CAUSES), and children who react to sound get no help.",
+     "suggestion": "Move the warnings an octave or more up and raise them 4-8 dB (each tested as above):\n- level2_enemies.js:235 growl: `for (let i = 0; i < 5; i++) { Snd.tone('sawtooth', 300 - i * 10, 200, 0.08, 0.13, i * 0.09); Snd.noise(0.07, 0.1, 1500, i * 0.09); }`\n- :705 dive: `Snd.tone('sawtooth', 1500, 500, 0.3, 0.1); Snd.noise(0.25, 0.12, 3500);`\n- level2_boss.js:756 grunt: `Snd.tone('sawtooth', 260, 150, 0.3, 0.25); Snd.tone('square', 130, 80, 0.28, 0.08); Snd.noise(0.22, 0.22, 1600);`\n- :760 rise: `Snd.tone('sawtooth', 120, 420, 0.5, 0.2); Snd.noise(0.5, 0.18, 1400);`\n- :758 growl: sawtooth from 184 + i * 12 down to 140, vol 0.2.\n- The laser whine (:764) could go from 0.05 to 0.1 (not re-measured).",
+     "effort": "small"
+    },
+    {
+     "id": "audio-4",
+     "category": "sound-design",
+     "title": "The MEGA BEAR's thuds and tremors, and the bears' footsteps, are deep bass only and vanish on laptop speakers",
+     "severity": "minor",
+     "known": false,
+     "files": [
+      "src/level2_boss.js",
+      "src/level2_enemies.js"
+     ],
+     "evidence": "Code:\n- sfx.thud, level2_boss.js:755: `Snd.tone('sine', 90, 32, 0.3, 0.35 * v); Snd.noise(0.18, 0.18 * v, 380)`. It is used for the intro tremors (:848), the arrival, the ground pound (:814), rock landings (:1114) and steps (:1046); 22 per run.\n- sfx.rumble, :768: sine 55 -> 30 Hz plus noise lowpassed at 220 Hz.\n- SFX.heavy (the bear's footsteps), level2_enemies.js:243: sine 85 -> 40 Hz plus noise lowpassed at 600 Hz.\n\nThe kids play on the MacBook Air. lapsfx.mjs measures each sound full-range and through the laptop-speaker model (a 4th-order high-pass at 180 Hz). Momentary loudness, full-range -> laptop:\n- MB rumble -34.2 -> -54.3\n- MB thud -31.8 -> -51.2\n- bear heavy step -42.3 -> -61.4\n- tractor landing -41.9 -> -54.2\n- door thud -36 -> -47.5\nFor comparison, Mission 1's boom only drops -26.3 -> -35.3 thanks to its 900-1400 Hz noise layer. The boss music is -41.8 LUFS on the laptop model, so the thuds end up 9-12 dB under it.\n\nPicture: H/shots/review-audio/crop-mb-thud-rumble.png, cut from sheet-sfx-m2-part1.png with box x0 y230 w640 h390. MB thud (centroid 79 Hz) and MB rumble (centroid 53 Hz) have nothing above about 250 Hz.\n\nFix test (thudfix.mjs) with a mid layer. Laptop model / full-range:\n- MB thud -54.1 -> -44.3 / -34.6 -> -33.9\n- MB rumble -54.3 -> -43.4 / -34.2 -> -33.4\n- heavy step -61.4 -> -49.5 / -42.3 -> -41.0",
+     "repro": "cd H/work/review-audio; node lapsfx.mjs m2:sfx-m2.json m1:sfx-m1.json; node thudfix.mjs. In the game on the MacBook speakers: the screen shakes harder and harder before the MEGA BEAR appears, but you hear almost nothing.",
+     "impact": "The giant boss's weight is mostly in its sound: the tremors, the stomps, the landing rocks. On the family laptop the build-up before the boss and its footsteps go almost silent, so the boss feels lighter than Mission 1's.",
+     "suggestion": "Add a mid crunch layer; full-range loudness stays the same (+0.7 dB):\n- sfx.thud(v): add `Snd.tone('square', 160, 80, 0.14, 0.1 * v); Snd.noise(0.16, 0.3 * v, 1200);`\n- sfx.rumble: add `Snd.noise(0.6, 0.3, 800); Snd.tone('sawtooth', 80, 50, 0.6, 0.08);`\n- SFX.heavy: add `Snd.tone('square', 150, 75, 0.1, 0.07); Snd.noise(0.1, 0.2, 1200);`\nThe same idea fits the tractor landing (vehicle.js:562) and the wolf landing thud (level2_enemies.js:237).",
+     "effort": "small"
+    },
+    {
+     "id": "audio-5",
+     "category": "sound-design",
+     "title": "The battle tractor makes no engine sound while driving",
+     "severity": "minor",
+     "known": false,
+     "files": [
+      "src/vehicle.js"
+     ],
+     "evidence": "Code: vehicle.js:496. The only running sound is the exhaust puff, `if (!quiet) Snd.tone('square', 70, 50, 0.05, 0.02)`. It plays every 26 frames, or every 9 with the throttle open. The engine start (:524, sawtooth 45 -> 130 Hz) is -45.5 LUFS-M and plays once.\n\ntractorfix.mjs over 6 s of the real ride in seed 1 (25 puffs): engine -61.1 LUFS, 23 LU under the music in the same 6 s (-38.0). On the laptop model it is -66.5 against -45.3. The isolated puff is -63.3 LUFS-M; see the TR exhaust puff tile in H/shots/review-audio/crop-quiet-tiles.png (sheet-sfx-m2-part4.png, box x0 y780 w640 h400).\n\nFix test: each puff as sawtooth 95 -> 70 Hz 0.1 s at 0.09 plus noise lowpassed at 1000 Hz at 0.09 measures -48.7 LUFS (laptop -52.2). At 0.13 / 0.12 that becomes about -45.5 LUFS (+3.2 dB, calculated).",
+     "repro": "cd H/work/review-audio; node tractorfix.mjs. In the game at x 2950, get into the tractor and drive without firing: only the music plays.",
+     "impact": "The battle tractor ride was a headline feature. Children expect a 'brrm' while driving, and a silent tractor feels like a sliding picture; the gun is the only sound it makes.",
+     "suggestion": "In vehicle.js:496 use `if (!quiet) { Snd.tone('sawtooth', hard ? 110 : 95, 70, 0.1, hard ? 0.15 : 0.12); Snd.noise(0.09, hard ? 0.14 : 0.11, 1000); }`. This targets about -45 LUFS, 7 LU under the music: clearly there, never louder than the gun. Parked tractors keep their silent puffs (quiet).",
+     "effort": "small"
+    },
+    {
+     "id": "audio-6",
+     "category": "mix-balance",
+     "title": "The shotgun is about 9 LU louder than the other guns, and its 5 pellets stack 5 identical hit sounds",
+     "severity": "minor",
+     "known": false,
+     "files": [
+      "src/weapons_extra.js",
+      "src/engine.js"
+     ],
+     "evidence": "Code:\n- weapons_extra.js:290 blast: `Snd.noise(0.32, 0.45, 1300); Snd.tone('sine', 160, 45, 0.28, 0.42); Snd.tone('square', 110, 55, 0.1, 0.1)`\n- 5 pellets per shot at :272\n- every pellet that hits calls damageEnemy, which plays Snd.clank() or Snd.hit() (engine.js:340-341)\n\nSustained loudness while fire is held (weaponloud.mjs): shotgun -31.4 LUFS with peaks of -9.9 dBFS, against pistol -40.8, H gun -40.1, tractor gun -41.1 and rocket launches -36.2. That is 8.7-9.7 LU above the plain guns.\n\nPellet stacking: frames with several hit/clank sounds starting at once:\n- sg-mega: 18 frames with 5, 13 with 4, 18 with 3\n- sg-bear: 7 with 5\n- flame, H gun and pistol runs: at most 3\nIn stack.mjs (sg-mega, update 247) 5 identical clanks start at 4.1167 s. Together they peak at -18.5 dBFS against -32.4 for one clank (-39.7 against -53.7 LUFS-M): +14 dB, because identical tones started together add up.\n\nFix test (sgfix.mjs): line 290 at x0.6 gives -35.5 LUFS sustained with peaks of -14.3. At x0.7: -34.3.",
+     "repro": "cd H/work/review-audio; node weaponloud.mjs; node stack.mjs logs2/sg-mega.err wav/stack.wav; node sgfix.mjs. The sandbox logs come from runsims.mjs with jobs2.txt (sg-* jobs).",
+     "impact": "Once a child picks up the S, the game suddenly gets much louder: every blast is close to an explosion, 2.5-4 per second. It also hides quieter warning sounds (see audio-3). The stacked click is a small harsh tick on top of each close-range hit.",
+     "suggestion": "1. Scale weapons_extra.js:290 to `Snd.noise(0.32, 0.27, 1300); Snd.tone('sine', 160, 45, 0.28, 0.25); Snd.tone('square', 110, 55, 0.1, 0.06);`. Measured: -35.5 LUFS, still the punchiest gun at +4.6 LU over the H gun.\n2. Play the hit sound once per enemy per frame. In engine.js:340-341 wrap the two sound calls in `if (e.sndT !== G.t) { e.sndT = G.t; ... }`. Sims are unchanged because sound does not affect the game. Mission 1 only differs on the rare frames where 2-3 H-gun bullets hit one enemy together. For exact Mission 1 sound parity, put the guard in a pellet onHit instead.",
+     "effort": "small"
+    },
+    {
+     "id": "audio-7",
+     "category": "music",
+     "title": "Muineira check (K7): in key, a true 6/8 jig, not harsh \u2014 but the gaita tune is thin and its bass disappears on laptop speakers",
+     "severity": "minor",
+     "known": true,
+     "files": [
+      "src/level2.js",
+      "src/audio.js"
+     ],
+     "evidence": "New evidence for K7, rendered with the game's own Music scheduler (music.mjs, laptop.mjs, theory.mjs, vigofix.mjs).\n\nNot harsh. The vigo sawtooth lead measures -51.8 LUFS, 3.4 LU quieter than Mission 1's square lead (-48.4). Above 2 kHz it carries 14.7% of its energy against 8.8%, which works out to about 1 dB less treble energy in absolute terms than Mission 1.\n\nThe problem is the opposite: the tune is quiet.\n- The lead sits 9.5 LU under the bass (-42.3) and kick (-41.5).\n- Every note fades to -80 dB within sd*0.85 = 0.14 s. A note stays within 20 dB of its start for only about 47 ms of a 167 ms eighth, so the 'gaita over a D drone' plays as short blips with no held drone.\n- On the laptop model the whole loop is -45.3 LUFS against Mission 1's main at -43.3. The bass (D2 = 73 Hz) falls to -52.2, against -46.0 for Mission 1's bass, which reaches 220 Hz.\n\nTheory check (theory.mjs): 0 of 96 steps fall outside D mixolydian. Bar rhythms are true jig figures: x.xx.x x3, x.xxxx x7. The kick is on 1 and 4, hats on 3 and 6, and the bar-16 pickup D4 F#4 A4 leads back to D5. Picture: H/shots/review-audio/spec-music-vigo.png (short blips; the seam at 16 s is seamless).\n\nFix test (vigofix.mjs), lead 0.16 and bass up an octave:\n- loop -41.0 LUFS on the laptop model (main -43.3)\n- lead -48.8 (main -48.4)\n- bass -42.8 on the laptop model\n- full range -37.4 (now -38.0)",
+     "repro": "cd H/work/review-audio; node music.mjs 2; node laptop.mjs; node theory.mjs; node vigofix.mjs. Listen to wav/music-vigo.wav and wav/music-vigo-lead.wav next to wav/music-main.wav.",
+     "impact": "The Galician tune is the signature of the level, and on the family laptop it comes through weaker than Mission 1's theme, mostly as kick and blips. Nothing is wrong or unpleasant; it is just less special than intended.",
+     "suggestion": "1. Small change: in src/audio.js:114 use `tr.leadVol || 0.11` as the lead volume (Mission 1 tracks have no leadVol, so they stay identical).\n2. In TRACKS.vigo (level2.js:902-903) set `leadVol: 0.16` and `bass: [50, 0, 57, 62, 0, 57]` (D3 A3 D4, the real roncon drone pitch).\n3. Optional, medium effort, for a real gaita: a per-track `drone: [50, 57]` that schedules one sawtooth per bar (6 * sd long, vol 0.03, on musBus), and legato lead notes that last through following rests (dur = sd * (1 + rests) * 0.9).\nMission 1's music stays unchanged either way.",
+     "effort": "small"
+    },
+    {
+     "id": "audio-8",
+     "category": "atmosphere",
+     "title": "The rain and the storm over the farm make no sound, and there is no thunder",
+     "severity": "polish",
+     "known": false,
+     "files": [
+      "src/level2_sky.js"
+     ],
+     "evidence": "None of Mission 2's 82 Snd/Music/say call sites is in src/level2_sky.js (grep over level2*.js, vehicle.js and weapons_extra.js). Yet weather() drives drizzle from about 3200, a downpour at 3500-4000 and storm clouds at 3080-4240 (level2_sky.js:12, :1120-1133). The full-run spectrogram H/shots/review-audio/spec-mix-l2s1.png shows nothing new in that stretch.\n\nTest (rainfix.mjs), a rain bed of Snd.noise(0.3, v, 6000) every 6 frames:\n- v0.04: -47.1 LUFS\n- v0.07: -42.6 LUFS\n- v0.10: -39.7 LUFS\nAbout 75% of its energy is above 2 kHz, where the jig has little.\nA thunder clap of noise 2.2 s at 0.3 lowpassed at 420 Hz, plus noise 0.5 s at 0.18 lowpassed at 2400 Hz, plus a sine 70 -> 35 Hz at 0.25 measures -29.2 LUFS-M (-40.7 on the laptop model).",
+     "repro": "cd H/work/review-audio; node rainfix.mjs. In the game, drive or walk through 3200-4100 in the downpour: you see heavy rain and hear only the jig.",
+     "impact": "The family asked for rain and a rainbow. The rain is beautiful on screen but has no sound, which misses an easy chance for atmosphere.",
+     "suggestion": "In L2.skyUpdate (level2_sky.js:1494) add `if (WX.rain > 0.05 && T % 6 === 0) Snd.noise(0.3, 0.04 + 0.03 * WX.rain, 6000);`: -47 LUFS in drizzle, -43 in the downpour, under the music. Optionally, while WX.storm > 0.8, play a thunder clap every 9-12 s with the values above and a G.sflash flash. skyUpdate does not run while paused, so nothing plays during pause.",
+     "effort": "small"
+    },
+    {
+     "id": "audio-9",
+     "category": "atmosphere",
+     "title": "In the opening scene the door creak is lost under the jig, which plays at full level from the first frame",
+     "severity": "polish",
+     "known": false,
+     "files": [
+      "src/level2.js",
+      "src/engine.js"
+     ],
+     "evidence": "Log of seed 1: 'music 0 play vigo engine.js:109'. beginMission starts TRACKS.vigo on frame 0 of the 'morning calm' opening scene. The creak (level2.js:657) is sawtooth at 0.03 / 0.03 / 0.025 plus noise at 0.03, at 210-360 Hz; isolated it is -51.8 LUFS-M.\n\ncues-intro.mjs over 5 runs, each intro sound against everything else at the same moment, in its own bands:\n- door creak -5.8 dB (0/5 louder than the rest)\n- door thud +5.8\n- eagle screeches +10.2\n- distant howl +7.5\n- sparrow chirps clearly on top (3-4 kHz, nothing else there)\nPicture: H/shots/review-audio/spec-intro-mix.png. The creak's sawtooth stack at about 0.77-1.3 s is faint between the jig's notes, while the chirps at 0.23 and 0.58 s and the screeches at 3.4 and 3.72 s stand out.",
+     "repro": "cd H/work/review-audio; node cues-intro.mjs logs/l2s*.err; node window.mjs logs/l2s1.err 0 6.5 intro-mix sfx,mus 200 (writes wav/win-intro-mix.wav).",
+     "impact": "Small. The door creaking open is the first story beat of the opening scene and is barely audible.",
+     "suggestion": "Either double the creak (level2.js:657: tone volumes 0.06 / 0.06 / 0.05 and noise 0.06, +6 dB, about 0 dB against the music), or hold the music until MISSION 2 START. To hold it, call Music.stop() in the intro's start() (level2.js:707) and Music.play('vigo') in the at(IT.go) line (level2.js:729). Skipping with Enter jumps to IT.go, so the music still starts.",
+     "effort": "small"
+    }
+   ],
+   "strengths": "- **Mission 1 sound is untouched.** With the logger attached, seed-1 Mission 1 runs on the pre-Mission-2 build and on the current build produce identical sound streams: 3770 tone, noise, music and speech events, 0 differences, including 8 s of the win screen.\n- **The built file matches the sources.** index.html gives the same Mission 2 sound stream as src/ (7946 events, 0 differences), so this review applies to what the kids double-click.\n- **No clipping anywhere.** In the full renders:\n  - Mission 2 seed 1 peaks at -5.4 dBFS (Mission 1: -7.4); the loudest sandbox (shotgun vs MEGA BEAR) at -3.4.\n  - At most 14 sounds play at once (Mission 1: 11).\n  - All 86,408 logged sound calls have valid values (no NaN, zero or negative).\n- **The overall balance matches Mission 1.**\n\n  | | Mission 2 | Mission 1 |\n  |---|---|---|\n  | whole mix | -32.2 LUFS | -32.6 |\n  | music | -37.9 | -38.5 |\n  | sound effects | -33.2 | -33.4 |\n  | level part, effects vs music (median) | -35.5 vs -36.0 | -37.8 vs -37.3 |\n\n  In the boss fight the effects sit 3-6 dB over the music in both missions.\n- **No repeated-sound spam.** No sound restarts on 2 frames or less more than 3 times in a row in any Mission 2 run or sandbox. Effective rate limits:\n  - footsteps share one 5-frame slot; wing flaps 8 frames\n  - wolf howl 220-frame cooldown; eagle screech 90\n  - flame whoosh and hiss timers\n- **Nothing plays where it shouldn't.** No game sound on the game-over or win screens except the usual jingle, ticks and fireworks, same as Mission 1. No endless loops or droning sounds.\n- **Music hand-overs are correct.** Checked with a forced game over at the boss and with the flow self-test (18/18 ok):\n  - boss lock -> bearboss\n  - game over -> music stop + 'Game over'\n  - continue -> vigo from 4400 + 'Mission start!'\n  - second boss lock -> bearboss\n  - win -> stop\n  - Mission 1 win -> vigo\n  - all clear -> 'All missions complete!'\n- **The music is well made.** Vigo is a real muineira: 6/8, 16 bars, D mixolydian with no wrong notes, jig rhythms, kick on 1 and 4, hats on 3 and 6, a pickup into the top. Bearboss is 16 bars of D minor, with 51 of 56 strong-beat notes on the chord. Both loop seamlessly and are longer than Mission 1's (16 s and 21.8 s vs 12.8 s and 5.6 s).\n- **The voice lines work.** All 7 new lines fire once at the right moment and never cut each other off (no two within 2 s in 5 runs; Mission 1 itself has 'Mission start!' then 'Thank you!' 0.02 s apart).\n- **No new sound is both loud and harsh.** The brightest ones (eagle screech 74% above 2 kHz, MB glint, chirps, bear swipe, MB crack) sit at -36 to -51 LUFS-M.\n- **Clear signals that work:** the freed jingle (+6.4 dB over the mix, 91%), pickups, egg-bomb beeps (+7.1 dB), the laser charge, the boss roar with 'Mega Bear!' and the death sequence (-20 LUFS-M, like Mission 1's).",
+   "coverage": "**What I built and ran.** An offline renderer (H/work/review-audio/audiolib.mjs on node-web-audio-api 2.2.0) that copies src/audio.js exactly: the same oscillator, noise and filter setup and the same bus volumes (master 0.6, effects 0.8, music 0.3). With it:\n\n- **Music:** the game's own scheduler (audio.js in a vm, clock advanced 1/60 s per update, tracks read from level2.js) rendered vigo, bearboss, main and boss for two loops each, plus each layer (lead, bass, drums) on its own; the loop seams and the boss hand-over are in the renders. A theory script checked key, rhythm and harmony.\n- **Logging:** an --extra logger (sndlog.js) recorded every sound call (time, game file:line, bus), every music note, Music.play/stop and say() during:\n  - 5 seeded Mission 2 runs, both heroes\n  - 2 Mission 1 runs, and Mission 1 on the legacy build (parity)\n  - the built index.html\n  - 12 weapon sandboxes: shotgun, rockets, flame, H gun, pistol against wolves, eagles, bear, robobear, MEGA BEAR, and the Mission 1 boss\n  - unkillable eagles, to get egg bombs\n  - a forced game over at the boss, and the flow self-test\n- **Measurements:**\n  - peak, clipping, LUFS-style loudness and treble share for whole runs, 1-second steps and every sound on its own (WAVs in H/work/review-audio/wav, 283 files)\n  - pile-ups and repeated-sound bursts, overlapping speech\n  - whether each warning or reward sound can be heard over the rest of the mix at its real moments (a 1/3-octave band comparison)\n  - a laptop-speaker model\n  - every proposed fix re-measured on the same events\n- **Pictures:** spectrograms and a 94-tile contact sheet in H/shots/review-audio (opened and checked: music vigo and bearboss, handover, intro, full run, sheep rescue, crops).\n\n**Not covered or approximate:**\n- Nothing was heard by ear or played in a real browser. Chrome's oscillators are smoother than node-web-audio-api's, so the treble figures are approximate; the levels follow the Web Audio spec.\n- The laptop numbers come from a 4th-order 180 Hz high-pass model, not a measured MacBook Air speaker.\n- The browser speech voice was not rendered: only timing, overlaps and texts were checked, not its loudness against the mix.\n- The audibility test is a simple band-energy comparison, not a hearing model. Its absolute dB figures are indicative; the before/after differences are the solid part.\n- Sounds continuing into pause were checked by reading the code only (overlaps the known K13); the bot never pauses.\n- The bot never picks up the S in real runs (K1), so the shotgun was measured only in sandboxes.\n- The MB ding happened once in 5 runs.\n- Audio glitches from frame stalls longer than the music's 120 ms look-ahead cannot be measured headless.\n- I did not hand-check every animal call's realism, the title or mission-select sounds (unchanged), or Mission 1 music beyond the parity diff.",
+   "sheet": "/private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/shots/review-audio/sheet-sfx-m2.png"
+  }
+ }
+]

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robot Rumble</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0b12; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; background: #000; display: block; }
+</style>
+</head>
+<body>
+<canvas id="game" width="480" height="270"></canvas>
+<!-- src loader: build.py replaces this script with the inlined src files -->
+<script>
+// Development build: loads src/*.js in manifest order, one file at a time (no build step; serve this folder over
+// http, see docs/engine-api.md). A file that fails to load is retried; errors (load failures, console.error,
+// uncaught exceptions) also show in a box on the page. Click the box to hide it.
+// Options: dev.html?level=2&x=1200&hero=1&god=1  or  dev.html?sandbox=soldier,drone
+(() => {
+  const shown = new Set();
+  const show = msg => {
+    if (shown.has(msg)) return;
+    shown.add(msg);
+    let box = document.getElementById('devlog');
+    if (!box) {
+      box = document.createElement('pre'); box.id = 'devlog'; box.title = 'click to hide';
+      box.style.cssText = 'position:fixed;left:8px;top:8px;margin:0;padding:6px 8px;max-width:calc(100vw - 32px);white-space:pre-wrap;' +
+        'font:12px/1.4 monospace;color:#fff;background:rgba(150,0,0,0.88);z-index:9;cursor:pointer';
+      box.onclick = () => box.remove();
+      document.body.appendChild(box);
+    }
+    box.textContent += (box.textContent ? '\n' : '') + msg;
+  };
+  const logError = console.error.bind(console);
+  console.error = (...a) => { logError(...a); show(a.map(x => x && x.message ? x.message : String(x)).join(' ')); };
+  addEventListener('error', e => { if (e.message) show(e.message + (e.filename ? ' (' + e.filename.split('/').pop().replace(/\?.*/, '') + ':' + e.lineno + ')' : '')); });
+
+  const v = Date.now();
+  const load = (files, i, tries) => {
+    if (i >= files.length) return;
+    const s = document.createElement('script');
+    s.src = 'src/' + files[i] + '?v=' + v;
+    s.onload = () => load(files, i + 1, 0); // the next file only once this one has run: manifest order
+    s.onerror = () => {
+      s.remove();
+      if (tries < 3) { setTimeout(() => load(files, i, tries + 1), 250 * (tries + 1)); return; }
+      console.error('Robot Rumble dev: failed to load src/' + files[i] + ' (is the server running? see docs/engine-api.md)');
+      load(files, i + 1, 0); // carry on without it: the rest of the game may still run
+    };
+    document.body.appendChild(s);
+  };
+  const start = tries => fetch('src/manifest.json', { cache: 'no-store' }).then(r => r.json()).then(files => load(files, 0, 0), err => {
+    if (tries < 3) setTimeout(() => start(tries + 1), 250 * (tries + 1));
+    else console.error('Robot Rumble dev: failed to load src/manifest.json (' + err.message + ')');
+  });
+  start(0);
+})();
+</script>
+</body>
+</html>

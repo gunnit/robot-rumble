@@ -1,0 +1,682 @@
+{
+  "summary": "Build Mission 3 (Volcano Island): level skeleton, then 7 parallel content builders (one new file each); integration comes later, after the Mission 2 fixes land",
+  "agentCount": 8,
+  "logs": [
+    "Skeleton: The Mission 3 skeleton is written and passes every check. /Users/macbookair/game/src/level3.js (1,190 lines) pushes LEVELS[2] with the spec's section 2 data: MISSION 3 / VOLCANO ISLAND, end 6200, hero"
+  ],
+  "result": {
+    "skeleton": {
+      "summary": "The Mission 3 skeleton is written and passes every check. /Users/macbookair/game/src/level3.js (1,190 lines) pushes LEVELS[2] with the spec's section 2 data: MISSION 3 / VOLCANO ISLAND, end 6200, heroStart 140, freedLabel 'ANIMALS RESCUED', music 'island', bossMusic 'whaleboss', the 4 sections, all 51 terrain points, water, lava, 25 plats, the 15 props, the 7 animals with their items, all spawns and the 4 locks.\n\nIt also contains:\n- **Hook wiring:** all six draw hooks look up L3.<hook> each time they are called and draw a readable stand-in when it is missing (time-of-day sky with the volcano, black sand / lagoon sand / jungle / basalt ground following groundAt, the lagoon and pond water with a front layer so the hero looks waist-deep, glowing lava with bubbles, plats drawn by type, stand-ins for palm, beachrock and jetski).\n- **update():** the lava rule (hurtPlayer + vy -7.5, held at full height), items in lava hopping onto the nearest bank, animals tossing their item forward, splashes when wading, the lava-bomb schedule, then L3.skyUpdate / L3.worldUpdate.\n- **load(cp):** resets Mission 3 state, then calls L3.skyLoad / L3.worldLoad.\n- **Placeholders:** a 3.1 s boat intro (Enter skips), POW_KINDS for all 7 caged animals, TRACKS.island and TRACKS.whaleboss, and the mission-card preview.\n\nI created the six other files as stubs only where they didn't exist (none did; all still 154 bytes): src/jetski.js, level3_enemies.js, level3_bees.js, level3_boss.js, level3_sky.js, level3_world.js. I edited no existing file.\n\n**Test results:**\n- `run.sh sim --level 3 --seed 1`: errors [], completed false, hitsBySection [0,0,4,122], deaths 42, score 6000, freed 5, x 5494. Hero 1 / seed 2 gives the same numbers.\n  - The 10 warnings are the expected unknown types: enemies bee, shark, frog, hive, lavashark, queenbee, megawhale; props palm, beachrock, jetski.\n  - AREA 3's 4 hits are one lava bounce in each river (x 4182, 4568, 4780, 5090); the bot never jumps the gaps.\n  - FINAL's 122 hits: the megawhale is a dead stand-in, so the boss lock ends at once and the bot keeps walking right into the crater's lava lake at the screen edge (x 6192), dying over and over. The bot can't finish until the boss exists.\n  - Freed is 5 because the bot jumps over the parrot (2700) and toucan (3640) cages: with no enemies it never fires.\n- **Parity:** `--level 1 --hero 0 --seed 1` gives true [] [0,0,5,9] 14150; `--level 2 --seed 1` gives true [] [1,4,1,10] 33000. Both unchanged.\n- **Rule tests:** all pass (listed under tests).\n- **Mission select:** screens.js already lays out 3 cards of 128 px (preview area 112x96). All titles drop to 1x because VOLCANO ISLAND doesn't fit at 2x. Card 3 shows 'MISSION 3 / VOLCANO ISLAND / 4 AREAS' with no BOSS line until ENEMY_TYPES.megawhale exists with boss: true and bossName.\n\n**Visuals:** 4 render rounds; the contact sheet is /Users/macbookair/game/tools/m3/work-skeleton/sheet.png (12 frames).\n\n**Still weak (honest):**\n- Everything visual here is a placeholder: the stand-ins are simple, and the intro, animals, card and music are decent but below the proposal frames.\n- The tracks are untested by ear: the harness has no audio.\n- The toucan is dark on dark backgrounds, and the turtle is partly hidden by the cage bars even with the head drawn over them.\n- Freed animals that spin or toss use canvas rotation, which softens their pixels.\n- The intro boat slides in over dry sand unless the world paints surf at the left end.\n- Once PROP_TYPES.palm exists, the palm at x 60 is drawn in front of the boat; the stand-in palm is drawn behind it.\n- Lock renders (x 4200, for example) can catch the hero in an invulnerability-blink frame where he isn't drawn.",
+      "notesForBuilders": "Data as written in level3.js:\n- **sections:** 0 'AREA 1: SHARK BAY', 2250 'AREA 2: HONEY JUNGLE', 3900 'AREA 3: LAVA RIVERS', 5300 'FINAL AREA: THE CRATER'.\n- **terrain, water, lava:** exactly the spec's points and ranges.\n- **plats:** pier 960/208/90, pier 1700/206/80; log 2480/200/60, rock 2900/186/50, lily 3196/225/18, 3252/225/18, 3300/225/16, log 3460/194/56, rock 3720/192/44; columns as specified for each river; catwalk 5380/196/60, 5560/190/50.\n- **props (drawn in this order):** palms 60, 230, 410, 1530, 2140, 2230; beachrock 600, 2100; crates 330 coin, 1560 heart, 2760 coin, 3560 heart, 4440 coin, 5340 heart; jetski 700 (last).\n- **pows:** turtle 520 S, pelican 1540 heart, parrot 2700 F, monkey 2980 B, toucan 3640 heart, iguana 4420 R, flamingo 5480 H.\n- **spawns:** as the spec, with y added where a frog sits on a platform: frog 2900 y 186, frog 3200 y 225, frog 3300 y 225. Hives at y 120 / 112 / 104.\n- **locks:** as the spec. Each lava-shark wave also carries `lava: 1` (the index in LV.lava of river 2).\n\nEngine facts:\n1. **Liquids:** LV.water and LV.lava are arrays of {x0, x1, y} on the level object. level3.js also sets L3.lavaAt(x) and L3.waterAt(x), which return the range holding x, or null. They are only set if nobody defined them first; level3.js loads last.\n2. **Ground under liquids:** groundAt(x) returns the floor: lagoon 246, pond 236, river beds and the lake bottom 262. Each lava bank is a 6-px slope (4058→4064, 4296→4302, 4556→4562, 4824→4830, 5030→5036, 5184→5190, 5940→5946). land() snaps anything below groundAt up onto that slope, so banks are not walls: frogs and others must check L3.lavaAt(nextX) themselves to treat lava as a wall.\n3. **Rides:** a ride sets p.x and p.y itself in its update; nothing follows the ground for it. The jet-ski must ride at water.y (234) inside 640-2090 and decide what happens at the shores and the sandbar (1490-1590, ground 232).\n4. **Hero splashes:** level3.js already makes the splashes for the hero wading (none while riding). Don't duplicate them in worldUpdate.\n5. **Jump cut:** the engine cuts a rising hero to vy -2.6 whenever jump isn't held. level3.js keeps the lava bounce at full height (S.bvy). Anyone else launching the hero upward (the boss spitting the hero out with PTOO, for example) must keep its own arc the same way.\n6. **Lava rule (level3.js):** a hit plus a bounce for the hero (not in a ride), even while invulnerable, with floating 'HOT HOT!' text.\n   - A respawn over lava is moved to the nearest bank or column on screen.\n   - Items in lava hop to the nearest bank.\n   - Enemies are not touched: lava sharks and the whale shark must stay inside their ranges themselves.\n7. **Wave entry points:** waves appear at cam ± 16 (or type.edge).\n   - 1200 lock: x 1184 and 1696, both inside the lagoon.\n   - 4440 lock: x 4424 and 4936, both on dry banks. The lavashark's make(e, spec) must move it into LV.lava[spec.lava] (river 2, 4558-4828). Spawned lava sharks (4180, 5100) start inside their rivers.\n   - 5720 boss: x 6216 is past the end (6200). The megawhale's make() must place it in the lake (5944-6200, y 238).\n8. **Lava bombs:** level3.js calls L3.lavaBomb(tx) in AREA 3 only (G.section === 2).\n   - The first comes 150 frames after the area starts, then one every 260 ±20% frames (130 while the 4440 lock is on).\n   - tx = hero x + rand(-30, 80), clamped to the screen. The call is wrapped in try/catch with errorOnce.\n   - load() resets L3.eruptT to 0 and nothing in level3.js decrements it: the sky owns that countdown.\n9. **Draw order:**\n   - VOLCANO.drawBehind = L3.drawBehind, then stand-ins for unregistered prop kinds, then the boat (S.boat).\n   - The boat is beached at x 100 (hull 73-127, bottom at y 213) after the intro, and comes in from x -60 during it. Please paint surf or shallows at x < 60 so it reads as coming from the sea.\n   - When L3.drawFront exists, level3.js no longer draws its translucent water front layer, so the world must draw its own (the wading hero and shark bodies need it).\n10. **Intro:** about 186 frames.\n    - G.p.hidden while the hero is in the boat; he hops out at intro t 100 and lands at x ~138-140 on y 214.\n    - MISSION 3 START! at t 148, the AREA 1 banner at t 162.\n    - Enter skips to t 148 with the hero at x 140.\n11. **Animal toss:** freed animals toss their item to hero x + 40 (on screen, never into lava). It works by re-aiming the item the engine drops at salute t 40; tossed items carry it.l3t.\n12. **Renders and bot:**\n    - `render --x` inside a river drops the hero into the lava at frame 1 (e.g. x 4200 shows a bounce). Lock renders use x = lock + 201.6.\n    - The harness bot walks right and never jumps lava gaps or dodges; teaching it is an integration task.\n13. **Mission card:** screens.js shows 3 cards of 128 px with titles at 1x. Card 3 gets its BOSS line once ENEMY_TYPES.megawhale has boss: true and bossName 'MEGA WHALE SHARK'.\n14. **Load-time RNG:** level3.js uses rand() only in update code (liquid splashes, bomb schedule, cage burst). It calls no Math.random at load or in drawing.",
+      "specAdjustments": "1. **Frog spawns:** frogs on platforms got y = the platform top (2900 → 186, 3200 and 3300 → 225). Spawns default to groundAt, which puts the lily-pad frogs on the pond floor under the water.\n2. **Lava-shark waves:** they carry `lava: 1`, because a wave enters at the screen edge, which is dry ground in the 4440 lock.\n3. **Animal thanks:** THANK YOU! is the engine's floating text (thanks: 'THANK YOU!'); each animal's own call is a sound played in onFree.\n4. **Item toss:** done without touching the engine, by re-aiming the item the engine drops behind the animal at salute t 40.\n5. **Lava bounce:** kept at full -7.5 height even when jump isn't held. Without that, the engine cuts it to -2.6 and the hero can never climb out of a river.\n6. **Not in the spec, kid-friendly additions:**\n   - a respawn over lava is moved to the nearest bank or column;\n   - 'HOT HOT!' text on a bounce.\n7. **Bomb timings I chose:** first bomb 150 frames into AREA 3, then 260 ±20% frames, 130 during the 4440 lock.\n8. **Intro caption:** 'SOMEWHERE IN THE SOUTH SEAS'; the hero says LET'S GO!. The intro is 186 frames (~3.1 s).",
+      "tests": "- **Final Mission 3 sims:**\n  - `tools/m3/run.sh sim --level 3 --seed 1`: {completed false, errors [], hitsBySection [0,0,4,122], deaths 42, score 6000, freed 5, x 5494}; 10 warnings, all unknown types: bee, shark, frog, hive, lavashark, palm, beachrock, jetski, queenbee, megawhale.\n  - `--level 3 --hero 1 --seed 2`: identical numbers.\n- **Parity:**\n  - `run.sh sim --level 1 --hero 0 --seed 1`: completed true, errors [], hitsBySection [0,0,5,9], score 14150.\n  - `run.sh sim --level 2 --seed 1`: completed true, errors [], hitsBySection [1,4,1,10], score 33000.\n- **Event log** (fixture /Users/macbookair/game/tools/m3/work-skeleton/diag.js):\n  - Lava hits at x 4182, 4568, 4780, 5090, then the crater lake.\n  - Items tossed by the animals land about 40 px ahead of the hero: S at 635, heart at 1637, B at 3077, R at 4516, H at 5570.\n- **Rule tests** (renders with tests.js plus t-*.js), all errors []:\n  - The intro ends at frame 186 with the hero at x 138.2, on the ground and visible.\n  - Enter at intro t 30 skips: the intro ends at frame 68 with the hero at x 140.\n  - The lava bounce peaks at y 145.6 (104 px up, jump not held) and the hero lands on the column at 4170.\n  - A 1-heart death in river 2 respawns the hero at x 4632, landing on the column at 4618.\n  - A coin dropped into river 2 at x 4712 hops to the bank at 4840 (y 222, not lava).\n  - The iguana's toss target (4570) was lava, so it aimed at the bank at 4546; the hero caught it in the air.\n  - With a mock L3.lavaBomb: first bomb at frame 150, gaps 114 / 155 / 141 during the lava lock and 218 after it.\n- **Renders:** 4 rounds of the intro (t 40 / 100 / 118 / 125 / 160), x 300, 1000, 1500, 2600, 3200, 4200, 4700, 5500, 5921.6, a zoo of all 7 animals caged and freed, and the mission select (all errors []). Each was opened, with crops of the animals, the boat and the card.",
+      "renders": [
+        "/Users/macbookair/game/tools/m3/work-skeleton/sheet.png",
+        "/Users/macbookair/game/tools/m3/work-skeleton/r4/a-intro040.png",
+        "/Users/macbookair/game/tools/m3/work-skeleton/r4/b-intro118.png",
+        "/Users/macbookair/game/tools/m3/work-skeleton/r4/c-x0300.png",
+        "/Users/macbookair/game/tools/m3/work-skeleton/r4/d-x1500.png",
+        "/Users/macbookair/game/tools/m3/work-skeleton/r4/e-x2600.png",
+        "/Users/macbookair/game/tools/m3/work-skeleton/r4/f-x3200.png",
+        "/Users/macbookair/game/tools/m3/work-skeleton/r4/g-x4200.png",
+        "/Users/macbookair/game/tools/m3/work-skeleton/r4/h-x4700.png",
+        "/Users/macbookair/game/tools/m3/work-skeleton/r4/i-x5500.png",
+        "/Users/macbookair/game/tools/m3/work-skeleton/r4/j-x5921.png",
+        "/Users/macbookair/game/tools/m3/work-skeleton/r4/k-zoo.png",
+        "/Users/macbookair/game/tools/m3/work-skeleton/r4/l-missions.png",
+        "/Users/macbookair/game/tools/m3/work-skeleton/r3/c-card.png",
+        "/Users/macbookair/game/tools/m3/work-skeleton/r2/zoo-tied.png"
+      ]
+    },
+    "builders": [
+      {
+        "key": "jetski",
+        "report": {
+          "file": "/Users/macbookair/game/src/jetski.js",
+          "exports": [
+            "RIDES.jetski",
+            "PROP_TYPES.jetski",
+            "PROP_TYPES.jetskiwreck"
+          ],
+          "summary": "The red BATTLE JET-SKI is done, with about 1060 lines in one block. There is no `var L3` line because the file exports no L3 hooks.\n\n**Look.** I lifted the art from the proposal's bay painter and redrew it in my own pixel painter at load time: crisp 1px outlines, 3-tone shading and a white copy of each sprite for the hit flash. It has:\n- the hull, with a cream pinstripe and a lightning bolt\n- a saddle, a console with a tinted windscreen, and a hood with vents and a headlamp\n- a whip antenna with a pennant (4 streaming frames and 4 lazy frames)\n- a nose gun on a ball mount, drawn at 13 angles from level to 90 degrees, each with its own muzzle flash\n- four riveted armour plates: bow, stern, hood cheek and gun shield\n\nEach frame the parts are put together on two small canvases (behind and in front of the seated hero) and drawn pitched in 2-degree steps, as the tractor is.\n\n**Alive.** It bobs on LV.water and noses up when the throttle bites or when it hops, and dips when braking. The hero leans with the throttle and the ponytail flies at speed. Behind it there is a rooster-tail jet that grows with speed, a V wake fixed to the water, bow spray, foam at the waterline, a red reflection and idle churn at the nozzle. In the air it drips and casts a shadow on the water. The console lights blink while parked.\n\n**Controls:**\n- Left/right is the throttle. It glides: top speed 2.1 on water, 1.0 skidding on sand.\n- Z hops: a tap gives 22 px, holding gives 30 px. After landing there is a 22-frame cooldown.\n- X fires the nose gun every 5 frames for 1 damage. Hold Up to swing it up to 90 degrees.\n- C fires a torpedo (8 in all). It drops into the water and skims the surface, speeding up. It bursts on fins, props, cages, shootable enemy shots and the shore, doing 6 damage in a radius of 24, and throws up a water spout. On sand or in shallow water it shows NEED WATER!\n- Down+Z hops off. If a pier is within 24 px, a scripted hop lands the hero on the deck. Otherwise the hero hops back into the shallows. The jet-ski stays parked and can be boarded again after the hero walks 26 px away.\n\n**Shores.** Each water range has its shorelines worked out from groundAt, so p.x stays in 670-2049 in the lagoon:\n- **Near shore:** the jet-ski stops with a sand bump.\n- **Far shore:** it runs up the sand nose-up, then the hero hops off by themselves onto the beach at 2113 with LAND HO!. The jet-ski stays beached at about 2050 as a `jetskiwreck` in 'beached' mode. That is not a RIDES key, so the bot can't re-board it and loop. I stop it 12 px short of 2060 so the bow stays clear of the beach rock at 2100.\n- **Sandbar (1490-1590):** I chose to let it skid across slowly, tilting with the slope and throwing up sand. That lets the bot cross the 1200 lock. Passing over the pelican's cage frees it by touch.\n\n**Damage.** The HUD panel is the proposal's: the jet-ski icon, JET-SKI, 5 pips that go green, then yellow, then red and blinking (the pip just lost flashes white), and a torpedo icon with its count. Each hit takes one armour point:\n- It sparks, clanks and gets 80 mercy frames.\n- The first four hits each knock off a plate, which tumbles and plops into the water. The bare patch shows bolt holes.\n- At armour 2 or less, dark smoke rises from the hood and ARMOUR LOW! shows.\n- At 0 the hero is thrown clear with UH-OH!. On water the jet-ski sputters, tips nose-up and sinks while the part below the surface fades into the water, with bubbles, GLUG! GLUG! BLUB!, a gurgle and a last foam pop. On the sandbar it shakes and falls apart into bolts with CLUNK!.\n\n**Fairness against the real sharks.** The shark fin box is 16 by 18 at y 217-235.\n- Level shots fly at y 221, or about 218 on the sandbar because the keel digs 1 px into the sand.\n- Shots start 24 px back inside the hull and only show from the muzzle on, so a fin at or under the bow is still hit.\n- The hop is short and has the landing cooldown. Without that, the bot (which jumps every 42 frames) was airborne almost all the time and its shots flew over the fins.\n\n**Bot.** With seed 1 it boards at 700, fights the whole 1200 SHARK PACK lock from the jet-ski, and is dropped on the far beach. Seed 2 and seed 3 with hero 1 play out the same way.\n\nRendering, render passes r1 to r8 (each viewed): fixed the grey plates that hid the red hull, made the gun thinner, made the rooster tail taller and thicker, strengthened the wake, added drips and a drawn smoke column, lowered GET IN!, cleaned up the HUD icon and fixed the torpedo speed.",
+          "tests": "All sims run through tools/m3/run.sh:\n\n**Final runs**\n- `sim --level 3 --seed 1` (full, after my last code change): `{\"completed\":false,\"state\":\"play\",\"errors\":[],\"hitsBySection\":[3,3,103,0],\"deaths\":35,\"continues\":11,\"seconds\":487.6,\"frames\":30000,\"score\":28900,\"freed\":5,\"x\":4158,\"level\":3,\"warnings\":[]}`. The run stalls in AREA 3 (lava). The bot can't jump lava gaps yet, which is an integration task.\n- `sim --level 3 --seed 1 --x 700`: `errors [], hitsBySection [1,6,108,0], frames 30000`. Jet-ski log (fx-log.js):\n  - f1: RIDE a5 t8 at x 700\n  - f460: LOCK1200 t28, on sand\n  - f600: still in the lock, at 1590 on the sandbar\n  - f1173: the lock is over, still RIDE a5\n  - f1381: beach at x 2048\n  - f1396: on foot at 2041, hopping to 2113; `jetskiwreck/beached@2050`\n- Parity, re-run after my last edit:\n  - `sim --level 1 --hero 0 --seed 1` gives `completed true, errors [], hitsBySection [0,0,5,9], score 14150`.\n  - `sim --level 2 --seed 1` gives `completed true, errors [], hitsBySection [1,4,1,10], score 33000`.\n\n**Lagoon runs (2600-2700 frames, earlier code)**\n- seed 1: boards at f562-580 at 700, the 1200 lock lasts t29 to t660 fought from the jet-ski, beach at f1937, hero on the beach at 2052 then 2113 at f1952. Armour 3 left.\n- seed 2: same story, armour 3 left.\n- seed 3 with --hero 1: armour 4 left.\n- In all three the bot only left the jet-ski at the auto hop-off. A logged exit shows the only on-screen target was a bee entering at +272 px.\n\n**Renders**\n- All scenario renders: errors [].\n- Sinking: forced armour 0 on water.\n- Falling apart: forced armour 0 on the sandbar, r8-fizzle. No errors; the pelican is freed and the plates bounce on the sand.\n- Damage: plates knocked off (the bits prop) were exercised by real shark hits in the sims, which run draw every 15 frames. No errors.\n\n**File checks**\n- No Math.random anywhere.\n- rand() appears only inside update functions (splash, sandSpray, rideUpdate, engineStart, hurtSmoke, fireGun, torpUpdate, torpBoom, rideHurt, plateOff, wreckUpdate, bitsUpdate).\n- The top level is `'use strict';` followed by one block.",
+          "renders": [
+            "/Users/macbookair/game/tools/m3/work-jetski/out/r7-parked.png",
+            "/Users/macbookair/game/tools/m3/work-jetski/out/r7-board.png",
+            "/Users/macbookair/game/tools/m3/work-jetski/out/r7-cruise.png",
+            "/Users/macbookair/game/tools/m3/work-jetski/out/r7-hop.png",
+            "/Users/macbookair/game/tools/m3/work-jetski/out/r7-gunup.png",
+            "/Users/macbookair/game/tools/m3/work-jetski/out/r7-torp.png",
+            "/Users/macbookair/game/tools/m3/work-jetski/out/r6-torphit.png",
+            "/Users/macbookair/game/tools/m3/work-jetski/out/r7-damaged.png",
+            "/Users/macbookair/game/tools/m3/work-jetski/out/r7-sand.png",
+            "/Users/macbookair/game/tools/m3/work-jetski/out/r7-pier.png",
+            "/Users/macbookair/game/tools/m3/work-jetski/out/r7-beach.png",
+            "/Users/macbookair/game/tools/m3/work-jetski/out/r7-beached.png",
+            "/Users/macbookair/game/tools/m3/work-jetski/out/r7-sink.png",
+            "/Users/macbookair/game/tools/m3/work-jetski/out/r8-fizzle.png",
+            "/Users/macbookair/game/tools/m3/work-jetski/out/r5-mathias.png",
+            "/Users/macbookair/game/tools/m3/work-jetski/out/r5-turn.png"
+          ],
+          "sheet": "/Users/macbookair/game/tools/m3/work-jetski/sheet.png",
+          "engineRequests": [],
+          "crossFile": [
+            {
+              "file": "src/level3_enemies.js",
+              "need": "Nose-gun level shots fly at y = water.y - 13 (221 in the lagoon), or about 218 while the jet-ski sits on the sandbar. Keep the shark fin box covering at least y 217-234, as it does now. Shots start 24 px back inside the hull, so a fin at or under the bow is hit. Torpedoes skim at water.y - 1 and burst with blast(x, y, 24, 6, 'player'). Ride hurtbox: {x: p.x - 27 (facing right) or p.x - 29 (facing left), y: p.y - 32, w: 56, h: 34}, with p.y = 234 afloat. FYI: sharkCanLeap ignores a hero outside its water zone, so the sandbar is a safe spot. The bot parks there during the 1200 lock. That's fine for kids, but it is your call."
+            },
+            {
+              "file": "src/level3_world.js",
+              "need": "The jet-ski draws its own waterline band, foam, wake, rooster tail and bow spray over the lagoon surface. It relies on L3.drawFront's translucent water layer to tint the hull bottom and the sinking wreck. The beached jet-ski sits at x 2050 (hull 2016-2085), just left of beachrock 2100 and touching its low left lump. Plates knocked off and the wreck are props of kind 'jetskiwreck', so they are drawn behind the hero."
+            },
+            {
+              "file": "src/level3.js",
+              "need": "While riding, p.y = water.y (234), or the sand line on the sandbar, and p.onGround = !airborne. Your wading splashes already skip riders. After Down+Z, a wreck or the far-shore hop, the hero is a normal walker again: wading, on a pier deck, or on the beach at x 2113."
+            },
+            {
+              "file": "integration / harness bot",
+              "need": "No bot change is needed for the lagoon. It walks into the parked jet-ski at 700, rides it across, fights the 1200 lock from it, and is dropped on the beach automatically when it reaches about x 2049. The beached jet-ski is a non-RIDES prop on purpose, so the bot never re-boards it."
+            }
+          ],
+          "knownIssues": [
+            "The pitched (rotated) jet-ski shows stair-step jaggies on the pinstripe and boot stripe at 2-6 degrees, while hopping or climbing the sandbar. This is the same nearest-neighbour rotation the tractor uses.",
+            "The jet-ski is about 70 px long, so it stays small on screen, as in the proposal. Its V wake is faint against the world's own white wave bands. The rooster tail and spray are what really sell the speed.",
+            "Nearly every run takes its first armour hit right after boarding at 700. The shark at 760 warns while the hero is still hopping into the seat (18 frames) and the bot never dodges. Fair, since there is a 50-frame warning, but worth knowing for tuning.",
+            "The bot spends most of the 1200 lock parked on the sandbar, where sharks don't leap (shark rule, not mine), so the lock is easy for it. A kid can do the same.",
+            "Down+Z away from a pier drops the hero into the 12 px deep shallows next to the jet-ski, which is safe. A kid has to walk 26 px away before the jet-ski can be boarded again (same as the tractor rule).",
+            "The hop has a 22-frame cooldown after landing. A kid mashing Z may feel it doesn't answer for a third of a second. I needed it so a jumping hero (or the bot) still spends most of the time on the water where the gun hits fins.",
+            "A torpedo fired while a fin is right under the bow bursts at once, next to the jet-ski. That is harmless to the hero and kills the shark, but it isn't a long skim.",
+            "The beached jet-ski can't be boarded again, by design. The far-shore hop-off is automatic and only happens while afloat (not mid-hop).",
+            "Sounds (hum, hop, gurgle, LAND HO! voice) can't be heard in the harness. They are only checked for not throwing errors.",
+            "Scenario renders use my fixtures (tools/m3/work-jetski/fx-keys.js and sc/*.js) to script keys, place a jet-ski under the hero and clear enemies. fx-shark.js is an unused stand-in now that the real shark exists."
+          ]
+        }
+      },
+      {
+        "key": "enemies",
+        "report": {
+          "file": "/Users/macbookair/game/src/level3_enemies.js",
+          "exports": [
+            "ENEMY_TYPES.shark",
+            "ENEMY_TYPES.lavashark",
+            "ENEMY_TYPES.frog",
+            "EB_TYPES.lavabomb",
+            "L3.lavaBomb(tx)"
+          ],
+          "summary": "level3_enemies.js is written and tested (1649 lines). The layout follows the spec: 'use strict'; var L3 = L3 || {}; then one block. The art comes from the proposal frames and is drawn into crisp outlined sprites once at load, with white copies for the hit flash. Drawing code uses hsh() and G.t only, and rand() is used only in update code.\n\nSHARK (hp 6, armored): the bay proposal's per-pixel shark is drawn at 9 leap angles (scale 0.8) plus one cruising-fin sprite (scale 0.95) with its dark underwater body. It cruises as a fin with a V wake, its body visible as a dark shape under the water. Before a leap it stops and turns to the hero for 50 frames: ripple rings spread, a red/yellow ring flashes, a red '!' pops up, the beacon blinks fast and the fin lifts. It then leaps in a high arc (44-60 frames, apex 52-74 px) to 10 px past where the hero was, jaws open on a glowing mouth, with a crown splash at both ends. It goes under for 30 frames (bubbles) and cruises again. Only the leap hurts; the fin has a small 16x18 box at the surface. Each shark keeps to its own stretch of deep water (lagoon ~674-1468 or ~1612-2050; the sandbar and the beaches act as walls), and wave sharks swim in along the water.\n\nLAVA SHARK (hp 7): the lava proposal's painted shark is bent into 7 leap angles. It has a fin with a glowing V wake and a hot collar. Warning (50 frames): the wake turns white-hot, bubbles swell, its head breaks the crust with a fast-blinking eye, and a '!' pops up. It then leaps over the gap so the arc passes through the chest of a hero on a column; a hero on a bank can only be reached right at the river's edge. It trails a lava streamer and drips lava. Its range is LV.lava[spec.lava] for waves, the lava at x, or the nearest lava (boss summons). Waves surface first (46 frames, can't be hit).\n\nSharks and lava sharks share one attack slot: only one warns or leaps at a time, with 40 frames' rest between attacks.\n\nFROG (hp 5): the jungle proposal's parts builder at 1.08 scale gives sitting/breathing frames, a blink, two croak frames with a ballooning throat sac, an open mouth, a squat and rising/falling leap poses. Warning: it croaks for 30 frames (sac bulges, RIBBIT! text, croak rings). The sticky tongue then lashes out at standing height; its tip box spans feet-31 to feet-25, so crouching or jumping avoids it. A hit STICKS: in the frog's update G.p.x is overridden to move 0.6 px/frame toward the frog, so the hero can't walk but can still jump. A jump tap, a drop-through, any other hit, a shot on the frog, or lava ahead frees the hero. Reaching the frog means one hurtPlayer() and a push back, then the tongue lets go. Only one frog may croak, lash or stick at a time. Hops: a 14-frame squat, then an arc to a platform or ground spot, with a dark landing shadow that grows as it comes down. Hops stay within ±110 px of home, on screen, never over or into lava or deep water, never past x 5690. A sitting frog's contact is 'block' (a harmless push); it only hurts when landing from a hop. Frogs on lily pads keep the platform y; wave frogs hop in from the edge.\n\nLAVA BOMB: L3.lavaBomb(tx) sets L3.eruptT = 30 and launches a molten rock (voronoi crust, 4 spin frames) from the upper right. It lands in 90 frames on the first surface at tx (platform, liquid or ground). A red/yellow ring with a '!' and a dotted line to the bomb blinks for the whole 1.5 s, shrinking and blinking faster in the last half second. The bomb can be shot. On impact the embers hurt only within 9 px; it also leaves a short harmless burning patch.\n\nAll robots burst into bolts, gears, springs and plates (hull plates, toothed jaw, tail fin, frog helmet and headlights). The pieces bounce on the ground and platforms, sink slowly in water and melt in lava. A kill in mid-leap gives AIR BONUS (500, or 600 for a lava shark).",
+          "tests": "All quoted from the final code:\n- run.sh sim --level 3 --seed 1: errors [], completed false, hitsBySection [3,3,103,0], deaths 35, score 28900, x 4158, warnings []. The bot gets stuck in lava river 1; the 103 AREA 3 hits are lava, lava-shark leaps and bombs on that stuck bot. Teaching the bot to cross is the known integration task.\n- run.sh sim --sandbox shark,frog,lavashark --god --frames 3000 --seed 1: errors [], warnings [], score 4200. The sandbox has no water or lava, so sharks and lava sharks use a stand-in pool at ground level so that every state still runs.\n- Parity: run.sh sim --level 1 --hero 0 --seed 1 -> completed true, errors [], [0,0,5,9], 14150. run.sh sim --level 2 --seed 1 -> completed true, errors [], [1,4,1,10], 33000.\n- In-level runs (diag.js logs who hurts the hero):\n  - --x 760: errors []; hits in Area 1 are bees plus 2 shark leaps on the jet-ski.\n  - --x 2560: errors []; frogs: 7 croaks, 7 lashes, 3 sticks, all broken by the bot's jumps; 2 hits from frog hop landings, the rest bees and the queen bee.\n  - --x 4180: errors [], hits [0,0,18,0] (stuck bot).\n  - --x 1401.6 --god: the 1200 shark-pack lock completes (x 2442).\n  - --x 4641.6 --god: the 4440 lava lock completes (3 lava sharks shot mid-leap, x 5068).\n  - --x 1000 seed 2, on foot without the jet-ski: 7 shark-leap hits on the never-dodging bot in about 2400 frames.\n- Tongue fixture work-enemies/t-tongue.js (drives real keys through updatePlayer), output in work-enemies/t-tongue.out:\n  - PASS stick+pull: pulled 12.00 px in 20 frames toward the frog while holding LEFT.\n  - PASS jump free: frog snaps back, why=jump, hero vy -5.14.\n  - PASS reach = 1 hit + push back: hearts 3->2, kb -3.40, after 72 frames pulled 43.2 px.\n  - PASS shoot free: one shot, frog hp 5->4.\n  - PASS crouch dodge.\n  - PASS jump dodge (held jump during the croak).\n- Edge fixture t-edge.js: lava sharks made at x 6100, 5900 and 6300 (the way the boss would summon them) go into the lake 5944..6200 and stay within 5952..6186 for 1800 frames, errors [].\n- Fixture t-wave.js: the queen-bee lock's wave frog spawns at 3878, hops on screen (3814), then croaks, lashes and sticks normally, errors [].",
+          "renders": [
+            "/Users/macbookair/game/tools/m3/work-enemies/sheet.png",
+            "/Users/macbookair/game/tools/m3/work-enemies/sheet/sh-warn.png",
+            "/Users/macbookair/game/tools/m3/work-enemies/sheet/sh-leap.png",
+            "/Users/macbookair/game/tools/m3/work-enemies/sheet/sh-burst.png",
+            "/Users/macbookair/game/tools/m3/work-enemies/sheet/fr-tongue.png",
+            "/Users/macbookair/game/tools/m3/work-enemies/sheet/fr-hop.png",
+            "/Users/macbookair/game/tools/m3/work-enemies/sheet/pond.png",
+            "/Users/macbookair/game/tools/m3/work-enemies/sheet/lv-warn.png",
+            "/Users/macbookair/game/tools/m3/work-enemies/sheet/lv-over.png",
+            "/Users/macbookair/game/tools/m3/work-enemies/sheet/bomb2.png",
+            "/Users/macbookair/game/tools/m3/work-enemies/sheet/deathf.png",
+            "/Users/macbookair/game/tools/m3/work-enemies/sheet/deathl.png",
+            "/Users/macbookair/game/tools/m3/work-enemies/r3/lava3.png",
+            "/Users/macbookair/game/tools/m3/work-enemies/r3/bomb.png",
+            "/Users/macbookair/game/tools/m3/work-enemies/t-tongue.png"
+          ],
+          "sheet": "/Users/macbookair/game/tools/m3/work-enemies/sheet.png",
+          "engineRequests": [],
+          "crossFile": [
+            {
+              "file": "src/level3_boss.js",
+              "need": "To call lava sharks into the crater lake, use makeEnemy({ t: 'lavashark', x, rise: true }) then e.active = true and push it to G.enemies. Any x works: the shark goes into the lava at x, or the nearest lava (the lake 5944-6200); tested at 5900, 6100 and 6300. `rise: true` (or `side` / `lava: 3`) gives a 46-frame surfacing entry. Lava sharks and lagoon sharks share an attack slot (one warning or leaping at a time); the whale's own attacks are not part of that slot. Its pieces melt in the lava when it dies."
+            },
+            {
+              "file": "src/jetski.js",
+              "need": "Shark fin box is x-8..x+8, y water-17..water+1 (217..235 in the lagoon), so a nose gun firing at feet-14 (220) hits fins. The leaping shark's box is about 46x19 turned to its angle and hurts only in state 'leap', so it hits the ride box through ride.hurt. A wave shark from the right lives in water 1612-2050 and never crosses the sandbar."
+            },
+            {
+              "file": "src/level3_world.js",
+              "need": "My enemies draw before your drawFront, so the translucent front water mutes the shark's underwater body and the lower half of its warning rings. The lava lip at y 250-252 covers a lava shark's fin base; I raised the warning head, eye and bubbles above it. Your foreground grass and leaf plants can hide a frog's landing shadow in some spots (around 2610-2650 for example), so please keep plants low or sparse where frogs sit (2560, 2780, 2900 rock, 3200/3300 pads, 4400, 5250, 5420, 5640)."
+            },
+            {
+              "file": "src/level3_sky.js",
+              "need": "L3.lavaBomb sets L3.eruptT = 30 at every launch. Bombs come in from off-screen at the top right (x tx+70, y -24), toward the volcano side."
+            },
+            {
+              "file": "src/level3.js (integration)",
+              "need": "L3.lavaBomb(tx) clamps tx to the camera ±8 and lands on the first surface at tx (column, bank slope, lava surface or ground), 90 frames after launch. The harness bot still needs to learn to cross lava gaps: today it stands in river 1, where lava sharks and bombs hit it. Hits by the never-dodging bot elsewhere: about one shark leap per 340 frames on foot in the lagoon; frog hops occasionally land on it."
+            }
+          ],
+          "knownIssues": [
+            "Sprites are built at load: 10 shark poses (about 112x112 each), 7 bent lava-shark poses, 8 frog sprites and 4 bomb frames. Wall time measured 0.4-1.3 s, but the machine's load average was about 36 during those runs, so the numbers are unreliable; idle cost was not measured (my guess is around 100 ms).",
+            "Enemies draw before the player, so a stuck tongue's sticky blob sits at the hero's near edge instead of on top of the hero sprite.",
+            "The world's translucent front water mutes the shark's underwater body and the lower half of its warning rings. The upper half of the ring, the '!' and the fast beacon stay clear.",
+            "Lava-shark fins sit below both standing and crouching shot height from banks and columns. A fin can only be hit with down-shots, grenades or while the shark leaps (each leap passes through standing height). A hero standing well back on a bank is out of reach on purpose; sharks still lunge at the bank edge, so the 4440 lock can be finished by shooting them mid-leap (shown with god mode).",
+            "A sitting frog's contact is 'block' (a harmless push). It only hurts when landing from a hop, or through the tongue reel-in. This is a kid-friendly choice; walking into a sitting frog does not cost a heart.",
+            "Frogs on lily pads are wider than the 16-18 px pads, so the pads are mostly hidden under them.",
+            "My additions beyond the spec: AIR BONUS (500/600 for a mid-leap kill), and the floating texts 'RIBBIT!', 'JUMP!' (when stuck) and 'GULP!' (when reeled in). All use the allowed pixel-font characters.",
+            "Shark leaps are steep at the start and end of the arc (nose almost straight up or down). This reads as dynamic in the renders but gets close to vertical.",
+            "Not checked visually: the leaping shark against the jet-ski hero (only shown on foot), lava sharks in the crater lake next to the real whale, and frogs on the FINAL-area catwalks."
+          ]
+        }
+      },
+      {
+        "key": "bees",
+        "report": {
+          "file": "/Users/macbookair/game/src/level3_bees.js",
+          "exports": [
+            "ENEMY_TYPES.bee",
+            "ENEMY_TYPES.hive",
+            "ENEMY_TYPES.queenbee (boss: true, bossName 'QUEEN BEE'; its death ends with e.dead = true and never calls bossDefeated)",
+            "EB_TYPES.stinger",
+            "ITEMS.honey"
+          ],
+          "summary": "I wrote the file as one 'use strict' block with no L3 hooks, so it has no `var L3` line. The pixel-buffer and shaded-part painters come from the proposal's jungle scene.js. Every sprite is baked once when the file loads; there are no canvases per frame, and no Math.random or rand at load or in drawing.\n\nBEE: the proposal's bee, baked in 16 poses (cruise, fast, climb, three charge curls, aim, and 10 dive angles), each with 3 wing frames. A faint copy of the previous wing frame gives the blur, and the bee bobs while buzzing. All bees on screen share one loose V that points at the hero and drifts toward him at no more than 0.6 px per frame, so a kid can get underneath. Only the bee at the point of the V attacks, one dive at a time:\n- 30 frames: orange stinger, abdomen curls forward, hot drips fall off.\n- 20 frames: white-hot stinger with a twinkling sparkle; the target locks onto where the hero stands at this moment.\n- A straight dive at 3.5 px per frame with speed lines, then it swoops back up to the tail of the V.\nBees only hurt while diving. They never attack during the intro or while the queen is winding up. hp 2, 100 points, and they burst into plates, glass and bolts.\n\nHIVE: an enemy hanging at its spawn y (the hang point). It draws its own mount: a mossy branch with leaves, a bromeliad and lianas in the jungle, and a riveted steel girder with a truss and a warning lamp from x 3900 on (I chose the girder for the crater). While on screen it lets out a bee about every 3 s, with at most 3 of its own alive. Before each one it shakes for 36 frames, with motion marks, a BZZ, a brighter door glow and a fast yellow lamp. It has 3 damage sprites, drips honey, and takes 14 hp. On death: HIVE DOWN!, 1000 points, steel and honey hexagon plates and bolts rain down, and it drops honey. The wreck stays as the empty mount with a snapped, swinging strap, harmless and ignored by the bot, until it scrolls away.\n\nQUEEN BEE: 60 hp, armoured, about 75 px long. She has a five-point jewelled crown, antennae with bulbs, a big red lens eye, a white frilled collar, a violet thorax with a gold sash and brooch, a banded gold and black armoured abdomen with a royal stinger, and two pairs of gold-framed glass wings. She enters with a fanfare and is immune until she reaches her spot, then hovers in a figure-8 below the boss bar. Her attacks:\n- Call: a buzz-roar with sound rings, then 2 bees fly in from the screen edges. She skips it when 2 or more bees are on screen.\n- Fan: 54 frames of glowing wind-up (orange, then white with a sparkle), then 3 slow stinger darts (2.4 px per frame, can be shot). Below half health she fires two volleys.\n- Swoop: she climbs to a start point while a shadow grows on the ground at the hero's x, with a blinking red and white double ring and a big '!' above the hero's head (58+ frames), then swoops through that spot in a U.\nBelow half health two armour plates pop off with BZZZ!!, she smokes and attacks more often. Death: she shudders and sinks, the crown pops off with POP! and a star and lands on the ground, then she bursts. QUEEN BEE DOWN! and 3000 points; she drops 2 honey, the bees of her lock pop one by one, and she ends with e.dead = true.\n\nSTINGER: a gold dart with a hot tip and a streak. It can be shot, and it sticks in the ground for 40 frames, harmless, then blinks out.\n\nHONEY: a honey jar with a checked cloth lid, worth 1000 points, with YUM! HONEY text.\n\nFixed along the way:\n- The bee formation reset to the low position of a diving bee.\n- The queen never called bees, because the count included bees still asleep far ahead.\n- The queen hid under the boss bar.\n- The swoop '!' was hidden behind the hero.\n- Load cost was cut from about 620 to 300-400 ms of CPU time: wings cached per angle, bounding-box scans, leg shapes built once.",
+          "tests": "All results below are from the final version of the file.\n- run.sh sim --level 3 --seed 1 -> completed false, errors [], hitsBySection [3,3,103,0], deaths 35, score 28900, freed 5, x 4158. The 3380 QUEEN BEE lock completes. The AREA 3 hits are the bot bouncing in lava (it can't jump the gaps); the boss isn't in this run.\n- run.sh sim --level 3 --x 3581.6 --seed 1 -> errors [], hitsBySection [0,7,116,0], x 4792. The queen fight lasts about 22 s for the bot (earlier runs logged with log.js: intro f41, death f1389).\n- Mission 1 parity: run.sh sim --level 1 --hero 0 --seed 1 -> completed true, errors [], hitsBySection [0,0,5,9], score 14150.\n- Mission 2 parity: run.sh sim --level 2 --seed 1 -> completed true, errors [], hitsBySection [1,4,1,10], score 33000.\n- Sandbox sims:\n  - --sandbox bee,bee,bee --frames 3000 --seed 1 -> errors [], 4 hits.\n  - --sandbox hive --frames 3000 --seed 1 -> errors [], 7 hits, score 4900.\n  - --sandbox queenbee --frames 4000 --seed 1 -> errors [], 15 hits. The sandbox has no lock, so she drifts while the bot walks on.\n  - --sandbox bee,hive,queenbee --frames 4000 --seed 2 --god -> errors [].\n- An earlier full sim with the state log gave 5 hits in AREA 2 and a 23 s queen fight.\n- Load check (work-bees/loadtime.mjs): 0 Math.random calls while the file loads, about 300-400 ms CPU for baking.\n- Every render: errors [], warnings []. That covers lock renders at --x 3581.6 (frames 100 to 545), death renders with work-bees/kill.js (--x 3581.6 and 2600), and renders at 2560/2600, 3250/3300, 400, 5560, plus the pose zoo (--level 4).",
+          "renders": [
+            "/Users/macbookair/game/tools/m3/work-bees/f-jungle.png (AREA 2: hive on its branch shakes and lets out a bee)",
+            "/Users/macbookair/game/tools/m3/work-bees/l-3250.png (pond hive)",
+            "/Users/macbookair/game/tools/m3/work-bees/f-fan.png (queen fan wind-up, white-hot)",
+            "/Users/macbookair/game/tools/m3/work-bees/f-darts.png (3 stinger darts)",
+            "/Users/macbookair/game/tools/m3/work-bees/f-rise.png (swoop tell: shadow, ring, !)",
+            "/Users/macbookair/game/tools/m3/work-bees/f-swoop.png",
+            "/Users/macbookair/game/tools/m3/work-bees/lock-190.png (call with BZZZZ! and rings)",
+            "/Users/macbookair/game/tools/m3/work-bees/f-pop.png (crown pop)",
+            "/Users/macbookair/game/tools/m3/work-bees/f-honey.png (QUEEN BEE DOWN!, honey and crown)",
+            "/Users/macbookair/game/tools/m3/work-bees/f-hb1.png and f-hb2.png (hive burst)",
+            "/Users/macbookair/game/tools/m3/work-bees/hk-240.png (hive wreck with snapped strap)",
+            "/Users/macbookair/game/tools/m3/work-bees/f-crater.png (girder hive at 5500, night)",
+            "/Users/macbookair/game/tools/m3/work-bees/zoo-bee.png, zoo-queen.png, zoo-hive.png (every pose pinned; zoo.js + zoo-<mode>.js, --level 4)",
+            "Zoomed crops: /Users/macbookair/game/tools/m3/work-bees/c-queen-*.png, c-bee.png, c-hive.png"
+          ],
+          "sheet": "/Users/macbookair/game/tools/m3/work-bees/sheet.png: 12 labelled frames from the final version (hive in the jungle, bee poses, pond hive, queen fan, darts, swoop tell, swoop, crown pop, honey and crown, hive burst, crater girder hive, queen poses). I have looked at it.",
+          "engineRequests": [],
+          "crossFile": [
+            {
+              "file": "src/level3_boss.js",
+              "need": "For the whale shark's roar to call 2 bees: `const b = makeEnemy({ t: 'bee', x: G.cam.x + W + 14, y: 80, cd: 60 }, e.lock); if (!b.dead) { b.active = true; b.facing = -1; G.enemies.push(b); }`. Without y a bee picks groundAt(x) - 96..116. cd is the number of frames before its first dive. Bees join the shared V and dive one at a time. They don't attack during G.intro, but they don't know about the whale's wind-ups (they only hold back for the queen's)."
+            },
+            {
+              "file": "src/level3.js",
+              "need": "For the mission card (G.p may be null there), ENEMY_TYPES.bee.draw works on a plain object: { type: 'bee', x, y, facing: 1, state: 'hover', st: 0, vx: 0, vy: 0, ph: 0, hitT: 0 }. state 'aim' with st 6 shows the white sparkle, and 'dive' with vx 2.5, vy 2.4 shows a dive. ENEMY_TYPES.queenbee.draw needs { state: 'hover', st: 0, vx: 0, vy: 0, facing, kick: 0, popT: 0, crown: true, hitT: 0 }. The draw code reads G.t and G.cam only through groundAt during rise/swoop, so keep those states out of the card. In-game I hit nothing from level3.js: the 3380 lock waves work as written, the queen enters at x cam + W + 70, and the lock ends when she sets e.dead after her death animation (about 100 frames)."
+            },
+            {
+              "file": "src/level3_world.js",
+              "need": "Hives draw their own mount in the enemy layer: the jungle branch reaches about 116 px left, 90 px right and 80 px above the hang point (the hives at 2620/3250 sit at y 120/112). The girder at 5500 (y 104) has a truss rising up and to the right to about y 0. If the world places a big tree or canopy prop exactly there it may overlap. In my renders both mounts sit naturally in front of the canopy and the crane."
+            },
+            {
+              "file": "integration / bot",
+              "need": "Hives are flying: true and hang above standing-shot height (shots at feet - 19 pass under the hive at y 120). The bot kills them by aiming up, which is intended: jump or hold Up. A dying hive (the wreck) is e.dying and ignored by the bot. Bot hits in AREA 2 are 3-7 per run, mostly in the queen fight."
+            }
+          ],
+          "knownIssues": [
+            "The queen is roughly the size of Mission 2's Robo Bear (about 75x50 px with wings), not bigger. Making her larger would mean rebuilding the pixel-level details (eye, crown, sash) at scale, so I did not.",
+            "Up to 4-5 bees can be on screen in the 3380 lock: two from the queen's call plus the two wave bees at d200/d320. Only one dives at a time and the call is skipped when 2 or more bees are on screen, but it can still look busy. The integrator may want to drop one wave bee.",
+            "In the sandbox (no lock) the never-dodging bot takes about 15 hits from the queen in 66 s, because the camera scrolls away and it rarely gets under her. In the real lock it takes 5-7 hits and the fight lasts about 22 s. A kid will probably need 30-45 s. Fight length and attack rate have not been tuned with a person playing.",
+            "Bees are never killed by lava and ignore it (they fly), and they don't react to the whale shark's or lava bombs' wind-ups.",
+            "Glows (stinger, door, eye, honey windows) use alpha discs like Mission 2's light effects, so they are not strict pixel art.",
+            "Baking at load costs about 300-400 ms of CPU on this heavily loaded machine (about 2 s wall time here), mostly the 10 queen poses. It is not yet measured in a browser.",
+            "The bee art is the proposal's single design, with no variants. The 1x charge glow is small but readable; the sparkle and white-hot phase are clear."
+          ]
+        }
+      },
+      {
+        "key": "boss",
+        "report": {
+          "file": "/Users/macbookair/game/src/level3_boss.js",
+          "exports": [
+            "ENEMY_TYPES.megawhale (boss: true, bossName 'MEGA WHALE SHARK', hp 450, contact 'none', edge 16; make() moves the wave entry (x 6216) into the crater lake at lock.at + 330, y 238)",
+            "EB_TYPES.mwrock (spat lava rock: shootable, r 7, lands on its marked spot)",
+            "EB_TYPES.mwdrop (breach lava drop: shootable, r 5, marked)",
+            "EB_TYPES.mwfx (harmless front-effects layer, r 0, not shootable: comic words, vacuum air streams, steam jet, RUN!/DUCK! hints, drawn over the hero)"
+          ],
+          "summary": "The MEGA WHALE SHARK is built and playable end to end. It is assembled from parts painted once at load, using the proposal's Pix painters, rebuilt: a 3/4-view head with a flat top, a pale upper lip, 5 curved gill louvres and an eye socket; the jaw at 8 gapes, with a D-shaped mouth that sags open; two body segments that bob one after the other while it swims, with a checkerboard of pale stripes broken at the 3 ridges and jittered spots as lamps; 2 dorsal fins; 5 pectoral flaps; 5 tail sweeps; 3 cheek bulges; the intake fan (plus a jammed version); 6 frames of lava pouring down its back that cools and breaks up lower down; and the breach pose, composited and turned nose-up at two angles. Every frame a pose rig places the parts, so it swims, gapes, chews, bulges its cheeks, dives, breaches and sinks.\n\nLive details: lamps that twinkle and go out one by one; amber camera-lens eyes whose pupils follow the hero, with blinks and a cross brow while it winds up; rims and splashes where it cuts the lava; gill steam; phase-2 holes that glow and spark; glints.\n\nFixes to the weak points in proposals/level3/boss/notes.md: the mouth no longer reads as a porthole or eye (the throat sits right of centre, with a lit tongue floor, ribs and teeth); the gills are louvres, not claw scratches; the spot pattern is no longer a mattress or window grid; the pectoral fin sweeps back along the waterline instead of reading as a leg; the lava tongues are no longer stiff pillars; the steam is 3-tone pixel puffs, not cotton balls; and there is a full rig instead of one static pose.\n\nBehaviour (each attack has its pose, sound and a warning of at least 0.9 s):\n- Intro: a fin glides across the lake, it rises with a splash and gives a ROOOAR!.\n- VACUUM: 60 frames of gape, glowing throat and spinning fan, then SLUUURP! for 150 frames (170 in phase 2). The pull is 0.8 px/frame, or 1.1 in phase 2, a little stronger near the mouth; walking away beats it. A RUN! hint with a left arrow shows. A hero reaching the catch line (screen x 214, still on the ledge) is whisked in: CHOMP!, chewing with the cheeks bulging and the hero's legs and boots kicking out of the lips, then PTOO! spat in an arc back onto the ledge with one hit. The arc is set by the boss each frame, so the engine's jump cut doesn't shorten it. Shots entering the open mouth do double damage (x2). A grenade sucked in, or thrown into the wide-open maw, is CHOMPed, thumps inside and comes back as BURP! for 30 damage.\n- ROCK SPIT: mouth shut, cheeks bulge, glow leaks through the lips. A red ring and ! sign blink on each of 3 landing spots for about 1.3 s before PTOO! sends 3 shootable rocks there.\n- DIVE AND BREACH: it sinks until only the fin shows, and the fin glides with a glowing wake. Then for 1 s bubbles and a growing glow mark the breach spot, and red marks show where the lava drops will land. SPLOOSH! it bursts up nose-first at screen x 290-310, never over the ledge, flops back, and the drops land on their marks.\n- Phase 2 below 50%: it shudders, plates pop off (booms and flying plates, then glowing holes), GRRRAWR!, and the vacuum gets stronger. GILL STEAM: the vents redden for 56 frames while DUCK! shows over the hero, then a jet of boiling puffs crosses the whole ledge at y 186-196. It hits a standing or jumping hero; a crouching one is safe (verified).\n- ROAR: once per phase, calls 2 bees, or 2 lava sharks into the lake on its second phase-2 call.\n- Death: onKill returns 'dying', sets G.winT = 360 and gives a falling last life back, as the updated engine doc asks. A rock flies into the open mouth and jams the fan (CLUNK!), it coughs smoke (KOFF! KOFF!), the lights go out tail to nose, the eyes go dizzy then dark, the lava cools, it sinks, then BUUURP! sends up a fountain of nuts, bolts, plates and gears. bossDefeated(e) follows at frame 262.\n- Kid-friendly safety net I added (not in the spec): a hero bouncing in its lava lake for 10 frames is gulped and spat back onto the ledge with no extra hit, under a NO SWIMMING! sign. Without it a hero (and the harness bot) could bounce under the whale all fight.\n\nNo Math.random or rand at load or in draw code. Particles are capped, sprites are built once, and the file is one block with no L3 export.",
+          "tests": "All runs through tools/m3/run.sh on the final file:\n- run.sh sim --level 3 --seed 1 -> completed false, errors [], hitsBySection [3,3,103,0], deaths 35, score 28900, x 4158, warnings []. The bot gets stuck in AREA 3's lava rivers and never reaches the boss (it never jumps lava gaps; that is the integration task). No errors from level3_boss.js.\n- run.sh sim --level 1 --hero 0 --seed 1 -> completed true, errors [], hitsBySection [0,0,5,9], score 14150 (parity OK).\n- run.sh sim --level 2 --seed 1 -> completed true, errors [], hitsBySection [1,4,1,10], score 33000 (parity OK).\n- Boss sims, run.sh sim --level 3 --x 5921.6 --seed N [--hero 1] [--god] --extra work-boss/diag.js (the fixture only logs HIT, ATK, CAUGHT and KILL; it changes nothing). Boss->kill is measured from its appearance and includes the 3.3 s intro:\n  - s1 hero 0: completed true, errors [], hitsBySection [0,0,0,5], deaths 1, seconds 63.6, boss->kill 54.8 s, 3 BURPs.\n  - s2 hero 1: true, [], [0,0,0,5], deaths 1, 61.6 s, boss->kill 52.8 s.\n  - s3 hero 0: true, [], [0,0,0,5], deaths 1, 67.0 s, boss->kill 58.2 s.\n  - s4 hero 1: true, [], [0,0,0,5], deaths 1, 61.7 s, boss->kill 52.8 s.\n  - --god s1: true, [], [0,0,0,0], boss->kill 68.2 s. --god s2 hero 1: true, [], [0,0,0,0], 68.9 s.\n  - In every non-god run, 2 of the 5 hits are the bot walking into the lake during the 60 frames before the wave spawns and during the intro. The rest are steam, rocks or drops it never dodges, or a PTOO.\n  - Earlier, with hp 480: boss->kill 69-72 s on seeds 2-4.\n- Forced-attack renders (work-boss/mrender.mjs plus f-attack.js and p-*.js) confirmed:\n  - a hero standing at x 120 is pulled, caught, chewed and spat back to x ~70-110 with hearts 3->2;\n  - a grenade during suction is swallowed (hp 450->420, BURP!);\n  - a crouching hero takes no steam hit (hearts stay 3), a standing one does;\n  - spit rocks land on their marks;\n  - breach drops land on their marks;\n  - phase 2 triggers, the death runs to bossDefeated, and errors are [] in every render.",
+          "renders": [
+            "/Users/macbookair/game/tools/m3/work-boss/shots/fH-300.png (idle)",
+            "/Users/macbookair/game/tools/m3/work-boss/shots/fH-130.png (intro: fin glides in)",
+            "/Users/macbookair/game/tools/m3/work-boss/shots/fF-186.png (intro: rising)",
+            "/Users/macbookair/game/tools/m3/work-boss/shots/fA-298.png (vacuum warning)",
+            "/Users/macbookair/game/tools/m3/work-boss/shots/fA-378.png (SLUUURP pull)",
+            "/Users/macbookair/game/tools/m3/work-boss/shots/fF-470.png (CHOMP, chewing, legs kick)",
+            "/Users/macbookair/game/tools/m3/work-boss/shots/fA-494.png (PTOO, hero spat out)",
+            "/Users/macbookair/game/tools/m3/work-boss/shots/fG-362.png, fG-375.png, fG-410.png (grenade swallowed, thump, BURP!)",
+            "/Users/macbookair/game/tools/m3/work-boss/shots/fB-278.png, fB-320.png (rock spit warning + marks, rocks in flight)",
+            "/Users/macbookair/game/tools/m3/work-boss/shots/fC-388.png (dive tell: bubbles, glow, drop marks)",
+            "/Users/macbookair/game/tools/m3/work-boss/shots/fC2-421.png, fC2-434.png (breach rising, flop back)",
+            "/Users/macbookair/game/tools/m3/work-boss/shots/dive-278.png, dive-328.png (sinking, fin glide)",
+            "/Users/macbookair/game/tools/m3/work-boss/shots/ph2-280.png, ph2-290.png, ph2-330.png, ph2-440.png (phase 2 shudder, plates pop, roar, phase 2 idle; rendered before the hole sprites were redone)",
+            "/Users/macbookair/game/tools/m3/work-boss/shots/fD-318.png (phase 2 steam jet, DUCK!)",
+            "/Users/macbookair/game/tools/m3/work-boss/shots/steamc-330.png (hero ducks under the steam)",
+            "/Users/macbookair/game/tools/m3/work-boss/shots/fE-284.png, fE-460.png (death: CLUNK!, BUUURP! of bolts)",
+            "/Users/macbookair/game/tools/m3/work-boss/shots/kill-300.png, kill-370.png, kill-420.png (death: KOFF, lights going out, sinking dark)",
+            "Zooms: /Users/macbookair/game/tools/m3/work-boss/shots/z-chew.png, z-breach2.png, z-ph2.png, z-steam.png, z-idle.png"
+          ],
+          "sheet": "/Users/macbookair/game/tools/m3/work-boss/sheet.png (12 labelled frames: idle, vacuum warning, SLUUURP pull, CHOMP/chew, BURP, rock-spit warning, rocks on marks, dive tell, breach, phase 2 gill steam with DUCK!, death CLUNK, death BUUURP)",
+          "engineRequests": [],
+          "crossFile": [
+            {
+              "file": "src/level3_world.js",
+              "need": "The boss clips itself at the lake surface (y 238) and draws its own bright waterline rims and splashes in the enemy layer. Keep the world's drawFront over the crater lake translucent, or limited to y >= 239, so those rims and the boss's lower body still read. The world's current lava lines up well in my renders."
+            },
+            {
+              "file": "src/level3_enemies.js",
+              "need": "On its second phase-2 roar the boss calls makeEnemy({ t: 'lavashark', x: lock.at + 300 and + 410, lava: LV.lava.length - 1 (= 3, the crater lake), side: 1 }). lavaRange must accept index 3, and a lava shark in the lake leaps at the hero on the ledge (5720-5940). I haven't seen this case rendered yet."
+            },
+            {
+              "file": "src/level3_bees.js",
+              "need": "The boss's roar calls makeEnemy({ t: 'bee', x: cam - 16 or cam + W + 16, side: -1 / 1 }) with no y. Your make() picks the height and 'enter' state, which works."
+            },
+            {
+              "file": "src/level3.js / integration (bot)",
+              "need": "With --x 5921.6, or arriving at the lock, the harness bot walks into the crater lake during the 60 frames before the megawhale wave spawns, and again while it chases the roar's bees. That costs 1-2 lava hits per run. In the fight, the boss's lake rescue spits it back onto the ledge. Teaching the bot to stop at lava edges removes these hits."
+            },
+            {
+              "file": "integration (engine facts)",
+              "need": "Things the boss does that other code may meet:\n- EB 'mwfx' sits in G.eb for the whole fight. It is harmless (r 0) and not shootable, and it is re-created if G.eb is cleared.\n- While chewing, the boss sets G.p.hidden = true and keeps p.inv >= 2 and p.fireCd >= 6. It gives back any grenade thrown while the hero is inside. It clears hidden at PTOO, and onKill clears it too.\n- onKill sets G.winT = 360, and bossDefeated comes at death frame 262 (before winT runs out)."
+            }
+          ],
+          "knownIssues": [
+            "Fight length with the pistol bot is 53-58 s from the boss appearing (68 s in god mode, with fewer BURPs). Real players with the flamingo's H.M.G. will likely be faster, about 45 s; I did not simulate that. hp 450 is the tuning knob.",
+            "BURP is generous (30 damage, and a generous suck-in window), and the bot gets 2-3 per fight. A kid who discovers it will shorten the fight noticeably. That is intended as the reward, but it can be lowered at integration.",
+            "In the breach pose the composite's pale lower jaw and throat, normally under the lava, shows as a big plain grey slab. The rotation is nearest-pixel plus a re-outline, so edges are slightly ragged. It is on screen for under 1 s.",
+            "The whale is shown nearly side-on (a slight 3/4 turn), at a smaller scale than the proposal's frame, because the lake here is only 256 px wide and the mouth has to sit at hero height by the ledge. The open mouth is about 60x40 px, against the proposal's 100x50.",
+            "The armour does not darken as it dies: the lights go out, the lava cools and the eyes go dark, but the armour plates keep their colours.",
+            "The puffed cheek in the rock spit and the kicking legs while chewing are small at 1x; they read at 2x zoom and up.",
+            "Lava sharks called into the crater lake (second phase-2 roar) are not verified in a render; that depends on level3_enemies.js accepting lava index 3.",
+            "The full-level sim never reaches the boss, because the bot is stuck in the AREA 3 lava rivers. Boss tests start at --x 5921.6, and their hit counts include 2 bot lava hits before the boss surfaces.",
+            "The steam puffs and glows use canvas alpha and radial gradients (soft light), not pure palette pixels, as the bear's laser does."
+          ]
+        }
+      },
+      {
+        "key": "sky",
+        "report": {
+          "file": "/Users/macbookair/game/src/level3_sky.js",
+          "exports": [
+            "L3.skyLoad(cp): builds the art once (first Mission 3 load), resets and pre-warms the particles",
+            "L3.skyUpdate(): counts L3.eruptT down by 1 per frame, refreshes the weather, steps the particles",
+            "L3.drawBG(cx): picks the backdrop from the camera x, with mist transitions T1 1950-2250, T2 3420-3860, T3 4950-5290",
+            "L3.drawOverlay(cx): light tints, sea spray glints, jungle shafts and pollen, dusk/crater tints, eruption flash, ash, embers, steam wisps",
+            "L3.weather() -> { ash, steam, night, erupt } (each 0..1; erupt = L3.eruptT/30; all 0 outside Mission 3)",
+            "L3.skyBuildMs(), L3.skyBuildSteps(): debug helpers that report the build time and each step's time"
+          ],
+          "summary": "The art is lifted and adapted from the four proposal scenes, painted once into crisp pixel strips with parallax. No Math.random or rand() anywhere in the file; particles run on a private random stream and are capped (ash 36, embers 28, steam 18).\n\nSHARK BAY (golden morning): sky with sun, rays and drifting cumulus; sea stacks and a far islet; the open bay with sailboats, a motorboat, gulls and sun glitter; a black-sand spit with palms, a fishing hut, nets, canoes and a new bamboo lookout with a flag; the turquoise lagoon. At its right end the spit rises into a misty jungle headland, so the jungle is foreshadowed.\n\nTHE VOLCANO is one landmark. The bay and the jungle share the same far sprite and position (it drifts slowly left as the hero walks); only its light changes between the two. It has its painted plume plus live puffs, a crater glow, a radio mast with a blinking light and two patrol drones. In LAVA RIVERS a close-up of the same notched volcano erupts.\n\nHONEY JUNGLE (late morning): far misty canopy, three basalt cliffs with live waterfalls, the understory (trunks, lianas, flowering trees, banana plants, tree ferns, undergrowth). A canopy-ceiling strip spans camera 1400-4000: its forest edge slides in over the end of the bay, its gaps line up with the volcano, light shafts fall through the gaps, and it opens up for the queen-bee lock.\n\nLAVA RIVERS (dusk): afterglow, stars, cloud banks with sloped bases and wispy tails; the big volcano with lava rivers, a jungle base, an ash plume and a live fountain; a ridge with palm silhouettes; a two-tier basalt cliff with three live lava falls and heat haze. When L3.eruptT > 0 the jets grow, the crater and plume flare, and the overlay flashes orange (toned down because bombs repeat every ~2 s in the lava lock).\n\nTHE CRATER (night): smoky red sky with stars and drifting smoke; a hazy farther rim with blinking base lights; the far wall with the blast door, glowing cracks and lava seeps; the lava lake reaching the far shore (darkened so the hero reads against it). Side walls are laid out so the boss camera 5720 matches the proposal: catwalk with blinking lamps and a pipe, crane, lava falls.\n\nTransitions never show two scenes' layers at once. The old scene dissolves into a mist (far layers first) in front of a rising fog, through which the new scene's far layer looms: jungle silhouettes, the erupting volcano, the crater wall. The new scene then condenses out of it, near layers first. Skies crossfade as plain gradients, which has no shapes and so no ghosts. This avoids Mission 2's ghosting.",
+          "tests": "run.sh sim --level 3 --seed 1 -> completed false, errors [], hitsBySection [3,3,103,0], score 28900, x 4158 (the bot stalls at the lava rivers, an integration item). run.sh sim --level 3 --seed 1 --x 5000 --frames 6000 (T3, crater, boss arena) -> errors [], hits [0,0,6,7], x 5805. Parity: run.sh sim --level 1 --hero 0 --seed 1 -> completed true, errors [], [0,0,5,9], score 14150; run.sh sim --level 2 --seed 1 -> completed true, errors [], [1,4,1,10], score 33000. Sweep: every 200 px (0..5600 plus 5720) at two frame offsets (f40, f140) = 60 renders, errors []; 13 transition frames through T1/T2/T3, errors []. Transition smoothness test (POP: drawBG alone at every camera x with G.t frozen, mean RGB change per step): no spike at the start, switch or end of any transition. All values sit inside the steady-state parallax range (jungle max 11.9 per 2 px); at the scene switches, max 5.4 (2094-2106), 0.8 (3634-3646), 1.6 (5114-5126). Eruption countdown (fixture t-erupt.js sets eruptT 30 at f120): 29/0.97, 23/0.77, 17/0.57, 11/0.37, 5/0.17; the real lava bomb at f150 then re-arms it to 30. Build time (all four scenes, once per session at the first Mission 3 load): about 270 ms on an idle machine. The raw figure was 53-73 s at load average 30-90, so I normalised it with a reference loop (2M Math.sin took 4.2-5.4 s vs about 20 ms idle). Treat 270 ms as an estimate. Per-step times are in t-build.js output and the notes.",
+          "renders": [
+            "/Users/macbookair/game/tools/m3/work-sky/sweep/ (60 frames: c<camx>-f40.png and c<camx>-f140.png for every 200 px)",
+            "/Users/macbookair/game/tools/m3/work-sky/sw1.png and sw2.png (sweep contact sheets)",
+            "/Users/macbookair/game/tools/m3/work-sky/r4/ (transition sequences: 1950 2025 2175 2250 / 3420 3530 3750 3860 / 4950 5035 5120 5205 5290), t12.png, t3.png",
+            "/Users/macbookair/game/tools/m3/work-sky/final/ and final-e/c4440-f208.png (eruption)",
+            "/Users/macbookair/game/tools/m3/work-sky/erupt/ (eruption fixture renders)",
+            "/Users/macbookair/game/tools/m3/work-sky/r5/intro-70.png (intro, camera 0)",
+            "/Users/macbookair/game/tools/m3/work-sky/z-*.png (zoom crops: ash, steam, spray, eruption)"
+          ],
+          "sheet": "/Users/macbookair/game/tools/m3/work-sky/sheet.png",
+          "engineRequests": [],
+          "crossFile": [
+            {
+              "file": "src/level3_enemies.js",
+              "need": "L3.lavaBomb should set L3.eruptT = 30 when it launches a bomb (it already does: verified, a real bomb at f150 re-armed it). The sky decrements eruptT once per frame in skyUpdate; nobody else should."
+            },
+            {
+              "file": "src/level3_world.js",
+              "need": "Fact: the sky's lagoon strip covers y 164-270 (colour #2498af at y 220-234, #1c88a5 at 235-250), so the world's water front over it should match roughly. The canopy ceiling (backdrop, parallax 0.6) is on screen from camera 1500 to about 3730; the world's giant trunks stand in front of it (I removed my own near trunks to avoid doubles). Behind the lava rivers the sky paints a molten far edge at y 226-270, and in the crater a darkened far lava lake at y 199-246, both behind the world's banks, floor and lake."
+            },
+            {
+              "file": "src/level3_world.js",
+              "need": "Optional: L3.weather() returns { ash, steam, night, erupt } (0..1) if the world wants to tint lava glow, vents or steam with the eruption or the time of day."
+            },
+            {
+              "file": "src/level3_world.js",
+              "need": "Fact: the bay backdrop already has a fishing hut, nets and two canoes on the far spit; the world's foreground hut, nets and canoe repeat that motif (reads as a fishing village). Mention only in case the world builder wants to vary its own."
+            },
+            {
+              "file": "src/level3.js",
+              "need": "None needed. All five sky hooks exist; the harmless debug exports L3.skyBuildMs and L3.skyBuildSteps are also present. skyLoad builds all four scenes at the first Mission 3 load (about 270 ms idle), so a checkpoint load does it too."
+            }
+          ],
+          "knownIssues": [
+            "For about 1 s at each transition midpoint the backdrop is mostly mist or smoke, with only the incoming far layer at ~55-70%. There is no ghosting, but less detail; the world in front carries the frame.",
+            "The dusk cloud banks are still stylised flat banks (I added sloped bases and wispy tails).",
+            "The overlay is deliberately subtle: ash flakes are barely visible against the purple dusk sky, spray glints are small, and steam wisps are soft alpha discs.",
+            "Soft effects (mist bands, glows, light shafts, steam, the eruption glow) are alpha-blended or additive, as in Mission 2, so they are not strict pixel art.",
+            "In the lava area my cliff wall and the world's back basalt columns share a purple palette; the depth separation relies on haze.",
+            "The bay's far hut, nets and canoe repeat the world's foreground fishing-village props.",
+            "The big volcano's size jumps between the jungle (far) and the lava rivers (near); the T2 smoke hides the change.",
+            "The build-time figure is an estimate, because this machine was at load average 30-90 throughout."
+          ]
+        }
+      },
+      {
+        "key": "world",
+        "report": {
+          "file": "/Users/macbookair/game/src/level3_world.js",
+          "exports": [
+            "L3.worldLoad(cp)",
+            "L3.worldUpdate()",
+            "L3.drawBehind(cx)",
+            "L3.drawGround(cx)",
+            "L3.drawPlat(pl)",
+            "L3.drawFront(cx)",
+            "PROP_TYPES.palm",
+            "PROP_TYPES.beachrock",
+            "L3.worldBakeMs (debug only: the last bake's wall time in ms)"
+          ],
+          "summary": "The Mission 3 world layer is written: 2148 lines in one block, and the only global it adds is L3. Static art is baked into pixel buffers. The sprites bake at load. The ground, platforms, river backs and lava textures bake in worldLoad, which builds once per terrain and is cached.\n\nGROUND, in 256 px chunks:\n- Black-sand beach: wind ripples with lit crests, sparse glints, pebbles, shells, driftwood, a tide line of seaweed, and turtle tracks to the turtle cage. The sand gets wet near the water.\n- Lagoon floor seen through the water: sand ripples, seagrass meadows, coral domes, staghorn, sea fans, reef rocks, starfish and a rusty anchor. The shores slant inward toward the viewer.\n- The sandbar is a coral-sand trapezoid.\n- Jungle floor: red tropical earth in wavy strata, moss and leaf litter on the lip, roots, stones. It turns scorched near the lava area.\n- The hot-spring pond's face is an ellipse with sinter terraces round it.\n- Basalt shelves: columnar jointing, ash on the lip, warm lava light near the rivers, branching glowing cracks.\n- Crater floor: rubble and bolts, a steel road with hazard stripes, and a ledge of hex basalt columns for the boss, lit by the lake.\n- The seams between the four areas cross-fade instead of dithering.\n\nLIQUIDS, read from LV.water and LV.lava:\n- Water: animated wave crests, sun glints, caustics on the lagoon floor, fish schools, foam at the shores and sandbar edges, and a foamy slanted shoreline at x < 60 so the boat comes in from the sea.\n- Lava rivers flow toward the viewer: one 168x72 tile, periodic both ways, scrolls in each river. Crust comes as whole rafts of cells, glowing at the outer cracks and only smouldering at the inner seams, so it is never a uniform net. Each river has a bright rippling edge and bubbles.\n- The lava lake is a still perspective crust with a crack hierarchy and a few open pools. Its cracks pulse slowly.\n\nPLATFORMS:\n- pier: stilts down to the floor seen through the water, braces, rails with rope, a life ring, a ladder, a glowing lantern.\n- log: mossy, with a cut end, shelf fungi and a fern.\n- rock: mossy basalt.\n- lily: drawn live; each pad bobs, with a notch, ripples and a water lily on some.\n- column: hex cap, three shaded faces, glowing low joints, a lava-lit rim, and a pulsing glow at its foot.\n- catwalk: steel grating, hazard edge, rails, truss legs and a blinking lamp.\n\nDECOR, behind the walking line:\n- AREA 1: a shallows band with reef surf; jagged sea stacks at parallax 0.5; a fishing shack on stilts; a net rack; an outrigger canoe; buoys; mooring posts with a gull; a JUNGLE signpost.\n- AREA 2: buttressed jungle giants with strangler figs, a branch, lianas and heliconias; elephant ears, monstera and banana; ferns; hibiscus bushes; a mossy cliff behind the pond with an animated waterfall, foam and mist.\n- AREA 3: charred stumps, basalt boulders, sulphur steam vents. Behind each river: the far lava reach, hazy back columns without lit caps (so they don't read as platforms) and a small lava fall.\n- FINAL AREA: pipe runs with valves and a riser, a lattice crane (its arm points back over the base, away from the arena), a control booth, blinking lamp posts and a DANGER! sign.\n\nFRONT LAYER:\n- Translucent water over waders, so the hero and robots show a waterline.\n- The lava lip and glow.\n- Effects: ripples and splashes round wading robots, steam from the vents and the hot spring, embers over the lava, falling leaves, crater ash.\n- Low foreground rocks, leaves and column stubs at parallax 1.3. They stay below y 248 and are skipped over every liquid, so they never hide a threat.\n\nPROPS:\n- palm: four baked variants, mirrored at random, swaying.\n- beachrock: a black lava rock with barnacles and a little crab that scuttles and waves.\n\nPERFORMANCE: the animated lines (surfaces, lips, far lava, falls, caustics) are pre-baked periodic strips scrolled with a few drawImage calls. The world hooks cost about 0.2-3 ms per frame here.",
+          "tests": "Mission 3 sim, run.sh sim --level 3 --seed 1 (final file): {\"completed\": false, \"errors\": [], \"hitsBySection\": [3,3,103,0], \"deaths\": 35, \"score\": 28900, \"freed\": 5, \"x\": 4158, \"warnings\": []}. No errors from any file. It does not complete because the bot never jumps the lava gaps; it gets stuck at river 1, which spec §6 lists as integration work.\n\nParity, final file: run.sh sim --level 1 --hero 0 --seed 1 gives completed true, errors [], hitsBySection [0,0,5,9], score 14150. run.sh sim --level 2 --seed 1 gives completed true, errors [], hitsBySection [1,4,1,10], score 33000. Both are unchanged.\n\nLoad checks (leak.mjs: base.html plus my file in a vm):\n- The only new global is L3; NONE and buf are not visible outside the block.\n- 0 Math.random calls at load, and the file has no rand() or Math.random at all. Effects use a private mulberry32 reseeded in worldLoad.\n- PROP_TYPES.palm and .beachrock are registered.\n- Hooks present: worldLoad, worldUpdate, drawBehind, drawGround, drawPlat, drawFront.\n\nBake timing. This machine is shared with 6 agents, so wall times are inflated 4-6x; the CPU times are from process.cpuUsage:\n- buildChunks: about 1.9 s CPU.\n- buildLava: 0.16 s CPU (it was 1.5 s before the shared river tile).\n- Load-time sprites: 0.66 s CPU.\n- First devStart of Mission 3 (world + level3.js): 3.15 s CPU, against 4.06 s for Mission 2's first devStart in the same harness.\n- Rebuild after that: 16 ms, because the bake is cached per LV.terrain.\n- Reported L3.worldBakeMs (wall): 8-21 s under the load.\n\nPer-frame cost of the world hooks (cmp3.mjs, 60 frames each, ms per frame, about):\n- Beach x300: drawBehind 0.66, the rest about 0.1.\n- Lagoon x900: drawBehind 0.72, drawGround 0.72, drawFront 0.26.\n- Sandbar x1500: drawGround 1.24.\n- Pond x3260: drawBehind 0.65, drawPlat 0.25.\n- Lava x4250 and x4700: under 0.3, but x4700 once measured 2.97 for drawBehind, probably noise from the load.\n- Crater and arena: 0.1-0.3.\n\nFull frame cost here, sky stand-in from level3.js: Mission 3 5-15 ms against Mission 2's 9-13 ms, after replacing the 1 px rect loops with scrolled strips.\n\nRender tests, all with errors []:\n- Every 150 px from 150 to 6150 at frames 60 and 200: 82 frames in tools/m3/work-world/sweep/, reviewed on sweep-sheet1..4.png.\n- The pond: r5/x3260-f60, r4/x3260-f90, final/x3300-f200.\n- Each lava river with the hero placed on a column through multi.mjs --post: r6/x4081-f60, x4685-f60, x5109-f60 and final/x4081/4685/5109 at f120 and f190.\n- Boss arena: r5/x5921.6-f60, final/x5921.6-f200; the sweep at 6000/6150 f200 shows the megawhale in the lake.\n- Intro, boat arriving: r6/xS-f40/f96/f150 and final/xS-f40/f120.\n\nSeven review rounds, each with Read and crops (crop.mjs).",
+          "renders": [
+            "/Users/macbookair/game/tools/m3/work-world/sheet.png",
+            "/Users/macbookair/game/tools/m3/work-world/sweep-sheet1.png",
+            "/Users/macbookair/game/tools/m3/work-world/sweep-sheet2.png",
+            "/Users/macbookair/game/tools/m3/work-world/sweep-sheet3.png",
+            "/Users/macbookair/game/tools/m3/work-world/sweep-sheet4.png",
+            "/Users/macbookair/game/tools/m3/work-world/sweep/ (82 frames: x150..x6150 step 150, f60 and f200)",
+            "/Users/macbookair/game/tools/m3/work-world/final/xS-f40.png",
+            "/Users/macbookair/game/tools/m3/work-world/final/x300-f200.png",
+            "/Users/macbookair/game/tools/m3/work-world/final/x900-f200.png",
+            "/Users/macbookair/game/tools/m3/work-world/final/x1500-f200.png",
+            "/Users/macbookair/game/tools/m3/work-world/final/x2550-f200.png",
+            "/Users/macbookair/game/tools/m3/work-world/final/x3300-f200.png",
+            "/Users/macbookair/game/tools/m3/work-world/final/x4081-f190.png",
+            "/Users/macbookair/game/tools/m3/work-world/final/x4685-f190.png",
+            "/Users/macbookair/game/tools/m3/work-world/final/x5109-f190.png",
+            "/Users/macbookair/game/tools/m3/work-world/final/x5400-f200.png",
+            "/Users/macbookair/game/tools/m3/work-world/final/x5921.6-f200.png",
+            "/Users/macbookair/game/tools/m3/work-world/r6/x4081-f60.png",
+            "/Users/macbookair/game/tools/m3/work-world/r6/x4685-f60.png",
+            "/Users/macbookair/game/tools/m3/work-world/r6/x5109-f60.png"
+          ],
+          "sheet": "/Users/macbookair/game/tools/m3/work-world/sheet.png — 10 labelled frames, 2 columns at 2x: 1 intro (boat in the shallows), 2 black-sand beach, 3 lagoon, 4 coral sandbar, 5 Honey Jungle, 6 hot-spring pond, 7 lava river 1 with the hero on a column, 8 lava river 2, 9 the crater, 10 boss arena.",
+          "engineRequests": [],
+          "crossFile": [
+            {
+              "file": "src/level3_sky.js",
+              "need": "Overlap: the sky's spit layer also paints a bamboo fishing hut, nets and canoes, the far sea stacks, jungle trunks with lianas and waterfalls, and the crater catwalk and crane. My world versions are the NEAR layer at parallax 1: a palm-thatch shack on stilts at x 270, a net rack at 178, a canoe at 454, jagged sea stacks at parallax 0.5 drawn only while over the bay, jungle giants at 2330/2852/3110/3470/3812, and the crane tower at 5668 with its arm pointing LEFT, so it never enters the boss arena (cam 5720). If the art director thinks two huts read as a repeat, the sky's near hut is the one to drop or reshape. My shallows band (reef surf at y about 204, turquoise down to the walking line) is drawn in drawBehind for x < 2230. It sits on top of whatever the sky paints below y 204."
+            },
+            {
+              "file": "src/level3.js",
+              "need": "Facts: the boat (drawn after L3.drawBehind) is covered from y 214 down by my ground. drawGround then draws the animated shoreline wash over the beach at x < about 66 (the sea's edge slants toward the viewer), so the hull reads as sitting in the shallows while it is at x < 60. Since L3.drawFront exists, the world draws its own translucent water over waders (lagoon and pond, from w.y+1 to the floor) plus a lava lip and glow over each lava range. Hero splashes are left to level3.js. worldUpdate only adds ripple rings round the wading hero, and ripples and splashes for wading robots."
+            },
+            {
+              "file": "src/level3_enemies.js",
+              "need": "Sharks, lava sharks and the megawhale are skipped by my wading effects (NOWADE): they draw their own wakes. Frogs that wade in the pond or lagoon get ripple rings and splashes from the world. Lava: the front lip covers y l.y..l.y+2 (250-252 in the rivers, 238-240 in the lake) in front of everything, and a translucent orange glow covers the 12 px above the surface. A lava shark's body below l.y+2 is hidden only by its own drawing, not by me."
+            },
+            {
+              "file": "src/level3_boss.js",
+              "need": "The lake is drawn as an opaque baked texture from y 238 to the bottom over x 5944-6200, with a bright edge at 238 and a front lip at 238-240 drawn in drawFront, so it covers anything there. The ledge 5700-5944 is hex columns; its last 6 px face the lake and are lit. No world decor stands in the arena except a DANGER! sign at x 5742 (ground level, behind) and low foreground rocks at the screen bottom over the ledge (none over the lake)."
+            },
+            {
+              "file": "src/level3_bees.js",
+              "need": "The hives at 2620/3250/5500 sit clear of world decor. The cliff top behind the pond hive (3250, y 112) is at y 150-156, the waterfall at x 3276-3289 from y 157 to 228. Nothing I draw reaches above y 150 in the jungle except the trunks (2330/2852/3110/3470/3812, about 22-30 px wide, with branches near the top of the screen)."
+            },
+            {
+              "file": "src/jetski.js",
+              "need": "Water visuals for the ride: the lagoon surface line is at w.y (234), with animated crests at 233-234. My front water layer covers 235 to the floor (246) with rgba(60,190,205,0.42), drawn after the hero and the ride, so the bottom 11 px of a jet-ski hull riding at 234 would look submerged. If the hull should stay crisp, draw it above y 235. That is a front-layer limitation; I can skip the layer while G.p.ride is set if the jet-ski builder prefers."
+            }
+          ],
+          "knownIssues": [
+            "Bake cost: buildChunks is about 1.9 s CPU on this loaded machine, single-shot at the first worldLoad. That is still less than Mission 2's first build (4.1 s here), but it is a visible pause on the very first Mission 3 start on a slow PC. Baking chunks lazily on first sight would spread it, at the cost of small hitches.",
+            "The sky builder's own bay layer also paints a hut, nets, canoes and stacks, so the bay has a far hut on the spit and my near shack. It reads as near and far, but it repeats the motif (see crossFile).",
+            "The turtle tracks on the black sand (x 524-626) are subtle at 1x; they read at 2-3x.",
+            "The sandbar face is a plain trapezoid of coral sand running to the screen bottom. It reads a little like a path; it has no sculpting.",
+            "Lily pads are mostly covered by the frogs that sit on them. Their bob is ±1 px visually, while the platform top stays fixed.",
+            "Back basalt behind the rivers and the crater ledge columns are flat-shaded slabs. They are less finely textured than the proposal's painted cliffs, which the sky now provides behind them.",
+            "The front water layer (0.42 alpha) is drawn over riders too. A jet-ski hull at 234 shows its lowest 11 px tinted (see crossFile).",
+            "The pipe-run stands and their foot plates were baked at load with the default ground (232). They end under the crater floor (222-224), where the ground hides them, so they look as if they go into the floor rather than resting on plates.",
+            "Back basalt clusters were checked visually so they do not read as platforms (no lit caps, hazy purple). A kid could still try to jump on one; they are clearly behind the walking line.",
+            "Not done: no seagull flights or butterflies in the world layer (the sky may have birds). The jungle has no lit light shafts of its own (left to the sky's overlay)."
+          ]
+        }
+      },
+      {
+        "key": "level",
+        "report": {
+          "file": "/Users/macbookair/game/src/level3.js",
+          "exports": [
+            "LEVELS[2] (VOLCANO ISLAND): the skeleton's data, hooks and wiring are unchanged; the intro is now 300 frames",
+            "POW_KINDS.turtle, .pelican, .parrot, .monkey, .toucan, .iguana, .flamingo (thanks 'THANK YOU!', each with its own call in onFree)",
+            "TRACKS.island, TRACKS.whaleboss, plus TRACKS.islandlava (the minor lava version, switched in by level3's update from AREA 3 on)",
+            "PROP_TYPES.l3boat: a private prop for the beached or arriving sailboat. load() puts it first in G.props when cp < 320",
+            "L3.lavaAt(x), L3.waterAt(x) (only set when nobody defined them first)"
+          ],
+          "summary": "I took over src/level3.js from the skeleton. Its data, hooks, liquid rules, stand-ins and file layout are unchanged ('use strict'; var L3; one block). Below is what is now in place of the placeholders. Scratch work and tools are in tools/m3/work-level/ and notes are in tools/m3/notes-level.md.\n\n(1) The seven animals were repainted at a larger size (turtle 38x23 up to flamingo 46x42). Each has 12 poses: stand, blink, look (peeks out with its head drawn over the bars), call (beak open while the HELP! bubble shows), happy, jump, salute (wing, flipper or paw at the brow), toss, and four frames for going home. The birds have real side-view flight frames and the walkers have 4-frame runs. The monkey's head is front-on.\n- In the cage an animal calls, peeks, looks back over its shoulder and shivers. When the hero comes close it does happy jumps and the cage rattles.\n- When freed it hops 20 px clear of the hero, who is usually standing on the cage. If it lands on a crate it stands on it (the pelican at 1560 and the iguana at 4440).\n- It salutes the hero with a twinkle, holds its present up over its head, then turns and throws it at salute t 40. The item is re-aimed from its hand to hero x + 40 (on screen, never into lava).\n- Each has its own dance (spin, flap, back-flip, hop, push-ups, twirl), then flies or runs home.\n- The iguana runs home toward lava river 1, so a walker over lava hops from column to column (runnerY) instead of sinking into the river.\n- Each has its own call made of short Snd tones.\n\n(2) Intro, 300 frames (5 s), golden morning with the volcano smoking behind:\n- A blue and white sailboat with a sun on the mainsail and a jib comes in from x -80, riding a wave that washes up the black sand.\n- It has a bow wave, a wake, a fluttering pennant and gulls, and the caption SOMEWHERE IN THE SOUTH SEAS.\n- At t 150 it runs aground with a crunch, a lurch and sand. The sail drops and is furled (t 158-182) and the hero stands up at 188.\n- The hero hops out at 198 and lands at x 139. LET'S GO! shows at 236, MISSION 3 START! with say() at 252, and the AREA 1 banner at 266. The bars go out over 272-300.\n- Enter skips to t 252 with the hero at x 140.\n- The boat is now a private prop drawn after the ground, so it can have a shadow and the wave over it. It stays beached at x 100 (hull 73-128, keel y 213).\n\n(3) Music:\n- TRACKS.island is a calypso in C: 16 bars, 236 bpm, every step a sixteenth. The lead is triangle with long notes rolled like a steel drum, the bass walks in the 3-3-2 rhythm, the kick is four on the floor, snare on 2 and 4, offbeat hats.\n- TRACKS.whaleboss is a driving A minor (Am F G E ...): 16 bars of eighths at 184, a root-and-octave bass, square lead.\n- TRACKS.islandlava is the island tune turned to A minor, faster, with a heavier bass. musicByArea() switches to it from AREA 3 on, also after a continue there.\n\n(4) Lava bombs come about every 3.5 s (210 frames ±20%), every 105 frames during the 4440 lock. The first comes 150 frames into AREA 3, they only fall in AREA 3, and nothing happens if L3.lavaBomb is missing.\n\n(5) The mission card was repainted: a golden sky, a volcano with jungle slopes, a lava trickle and a plume, the deep bay and the lagoon, a swaying palm, and the hero shooting from the black sand. A big robot shark (5 crisp angles, jaws open on a glowing throat) circles as a fin, warns with a red ring and !, leaps high toward the hero and splashes back. It reads at both 112x96 and 180x96.",
+          "tests": "Final runs all load src/level3.js.\n- run.sh sim --level 3 --seed 1: {completed:false, errors:[], hitsBySection:[3,8,95,0], deaths:34, score:26250, freed:6, x:4070, warnings:[]}. The bot gets stuck at lava river 1, which is an integration item. Most AREA 3 hits are lava bounces.\n- Seeds 2 and 3, hero 0 and hero 1: errors [] in all 4 runs. Seed 2 gives [3,6,94,0] at x 4093, seed 3 gives [3,8,100,0] at x 4093. Hero 0 and hero 1 give identical runs.\n- Parity: run.sh sim --level 1 --hero 0 --seed 1 gives completed true, errors [], [0,0,5,9], score 14150. run.sh sim --level 2 --seed 1 gives completed true, errors [], [1,4,1,10], score 33000.\n- free.mjs (the hero walks into each cage in the real level): every toss lands 40.0 px ahead of the hero and on screen (turtle S at 549.5 with the hero at 509.5, pelican heart 1569.5, parrot F 2729.5, monkey B 3008.1, toucan heart 3669.5, iguana R 4449.5, flamingo H 5508.4). No errors.\n- skip.mjs:\n  - Enter at intro t 31: the intro ends at frame 79 with the hero at 140/214, on the ground and visible, and MISSION 3 START! plus the AREA 1 banner set.\n  - Full intro: ends at frame 300 with the hero at 139, music 'island', one boat prop.\n  - At x 4000 (section 2): music 'islandlava'. In the boss lock: 'whaleboss'.\n- bombs.mjs (run before I changed the rate to 210 frames, not re-run after):\n  - From x 3850: first bomb at f196 (150 frames after entering AREA 3), gaps 213/247/225, tx 7 px behind to 76 px ahead of the hero.\n  - In the 4440 lock: gaps 110/138/108/107/140/134.\n  - In the crater: 0 bombs.\n- irun.mjs: the freed iguana runs onto the river 1 columns (y 205/206/198) with arcs between them, never down into the lava.\n- music.mjs structural check:\n  - island: lengths 256/256 and drums 16, loop 256 steps = 32.5 s, notes 67-88, bass 38-57. The first note of every bar is a tone of that bar's chord (E F G E C F B C A F G D C D G C).\n  - islandlava: loop 256 steps = 30 s, A minor with G# on the dominant.\n  - whaleboss: lengths 128 and drums 8, loop 20.9 s, bar notes A F G G# A A B G# D E F G# C D E E.\n  - No invalid notes. The seams are 8, 9 and 1 semitones.",
+          "renders": [
+            "/Users/macbookair/game/tools/m3/work-level/sheet.png (the contact sheet, 12 labelled frames)",
+            "/Users/macbookair/game/tools/m3/work-level/final/intro-sheet.png (intro at t 60/120/152/170/212/244)",
+            "/Users/macbookair/game/tools/m3/work-level/final/zooA.png and zooB.png (every animal: idle, peek, hop, free, salute, held, toss, dance, away)",
+            "/Users/macbookair/game/tools/m3/work-level/r3tied.png and r3free.png (full pose sheets at 3x)",
+            "/Users/macbookair/game/tools/m3/work-level/f3/*-strip.png and f4/*-strip.png (each animal freed in the real level: near, pop, salute, held, toss, dance, away)",
+            "/Users/macbookair/game/tools/m3/work-level/c2/cards.png (card at 112x96 and 180x96 at 6 moments) and c2/missions1.png (the 3-card mission select)",
+            "/Users/macbookair/game/tools/m3/work-level/irun-116.png (the iguana going home over the columns, a lava bomb ring)",
+            "/Users/macbookair/game/tools/m3/work-level/r0/ (skeleton baseline for comparison)"
+          ],
+          "sheet": "/Users/macbookair/game/tools/m3/work-level/sheet.png",
+          "engineRequests": [],
+          "crossFile": [
+            {
+              "file": "src/level3_world.js",
+              "need": "The sailboat is no longer drawn in drawBehind. It is a private prop 'l3boat', first in G.props, so it draws after drawGround and behind the palms. Beached: hull x 73-128, keel y 213, mast at x ~104 up to y ~141. During the intro it draws its own translucent wave wash and foam over your shallows at x < ~134; this recedes by intro t 200. Nothing is needed from you, but avoid placing decor at x 70-135, y 140-216."
+            },
+            {
+              "file": "src/level3_bees.js / src/level3_enemies.js",
+              "need": "The intro now lasts 300 frames (it was 186). The bee at 300 hovers during it; your code already checks G.intro, so nothing to change."
+            },
+            {
+              "file": "integration (screens.js / manifest)",
+              "need": "TRACKS.islandlava is new. level3's update plays it while G.state is 'play', G.section >= 2 and Music.track === TRACKS.island, and switches back below section 2. Boss music and the win screen are untouched. The card works at both 112x96 and 180x96. The BOSS line on card 3 appears once ENEMY_TYPES.megawhale is loaded. Mission 3 has no menuBG, so the hero select shows the jungle; one could be added later."
+            },
+            {
+              "file": "integration (harness bot)",
+              "need": "sim --hero 1 gives the same run as --hero 0. The bot still stalls at lava river 1, as noted in the skeleton."
+            },
+            {
+              "file": "any file reading G.pows",
+              "need": "Freed Mission 3 animals carry extra fields: o.l3side (which way it hopped clear), o.l3dir and o.l3tx (toss direction and target), o.l3air (in the air hopping across lava). While a non-flying animal runs home over lava, level3's update overrides its o.y after updatePows."
+            }
+          ],
+          "knownIssues": [
+            "I can't listen to the music, so the tracks are only checked for structure (lengths and loop seams, note ranges, chord tones on each bar's first step). The triangle lead plays at the engine's fixed melody volume and may sound quiet next to the bass.",
+            "None of the 6 Mission 3 sims completes. The bot never jumps the lava gaps, so it stalls at river 1 (x ~4070-4093) and most AREA 3 hits are lava bounces. Teaching the bot is an integration task.",
+            "The toss still finds the item the engine drops by its position (t 1, x o.x - 10.6), as the skeleton did. If the engine's dropItem offset or the item update order changes, the item falls behind the animal again and isn't thrown.",
+            "The present held over the animal's head is drawn by calling ITEMS[k].draw with a fake item. A very large or animated item draw could overlap the floating THANK YOU! and 500 text, as it already partly does.",
+            "On the frames where the boat runs aground the sprite is rotated slightly, so its edges look a little jagged then.",
+            "The HELP! bubble is drawn in the POW layer, so the world's foreground plants (drawFront) can cover it in the jungle. Mission 2 drew it in its overlay; here the overlay belongs to the sky file.",
+            "On the card, the hero's shots fly level and pass under the leaping shark.",
+            "Bomb rate is 210 ±20% frames (105 in the 4440 lock), down from the skeleton's 260/130 to match 'every ~3.5 s'. It may need tuning at integration (spec target: about 22 hits or fewer for the bot). bombs.mjs was not re-run after this change; its logged gaps are from 260/130."
+          ]
+        }
+      }
+    ]
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Skeleton"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 2,
+      "title": "Build"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "skeleton:level3.js",
+      "phaseIndex": 1,
+      "phaseTitle": "Skeleton",
+      "agentId": "abf480556cd13adb7",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794392104527,
+      "queuedAt": 1794392104044,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "The Mission 3 skeleton is written and passes every check. /…",
+      "promptPreview": "You are one of several agents building MISSION 3 \"VOLCANO ISLAND\" for Robot Rumble, a Metal Slug-style pixel-art run-and-gun game a parent is making for their two children (ages 8-10). Heroes Ines or Mathias. Missions 1 (ROBOT JUNGLE) and 2 (VIGO HILLS) exist. The parent approved a proposal of four painted screens and asked us to build it.\n\nREAD FIRST, fully:\n- /Users/macbookair/game/docs/level3-s…",
+      "promptFramed": true,
+      "lastProgressAt": 1794394105910,
+      "tokens": 416132,
+      "toolCalls": 104,
+      "durationMs": 2001372,
+      "resultPreview": "{\"summary\":\"The Mission 3 skeleton is written and passes every check. /Users/macbookair/game/src/level3.js (1,190 lines) pushes LEVELS[2] with the spec's section 2 data: MISSION 3 / VOLCANO ISLAND, end 6200, heroStart 140, freedLabel 'ANIMALS RESCUED', music 'island', bossMusic 'whaleboss', the 4 sections, all 51 terrain points, water, lava, 25 plats, the 15 props, the 7 animals with their items, …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "build:jetski",
+      "phaseIndex": 2,
+      "phaseTitle": "Build",
+      "agentId": "a2b29c94337ea898e",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794394106912,
+      "queuedAt": 1794394106432,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "/Users/macbookair/game/src/jetski.js",
+      "promptPreview": "You are one of several agents building MISSION 3 \"VOLCANO ISLAND\" for Robot Rumble, a Metal Slug-style pixel-art run-and-gun game a parent is making for their two children (ages 8-10). Heroes Ines or Mathias. Missions 1 (ROBOT JUNGLE) and 2 (VIGO HILLS) exist. The parent approved a proposal of four painted screens and asked us to build it.\n\nREAD FIRST, fully:\n- /Users/macbookair/game/docs/level3-s…",
+      "promptFramed": true,
+      "lastProgressAt": 1794401643549,
+      "tokens": 490499,
+      "toolCalls": 152,
+      "durationMs": 7536618,
+      "resultPreview": "{\"file\":\"/Users/macbookair/game/src/jetski.js\",\"exports\":[\"RIDES.jetski\",\"PROP_TYPES.jetski\",\"PROP_TYPES.jetskiwreck\"],\"summary\":\"The red BATTLE JET-SKI is done, with about 1060 lines in one block. There is no `var L3` line because the file exports no L3 hooks.\\n\\n**Look.** I lifted the art from the proposal's bay painter and redrew it in my own pixel painter at load time: crisp 1px outlines, 3-to…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "build:enemies",
+      "phaseIndex": 2,
+      "phaseTitle": "Build",
+      "agentId": "a165788dd6ba9da52",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794394106913,
+      "queuedAt": 1794394106435,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "/Users/macbookair/game/src/level3_enemies.js",
+      "promptPreview": "You are one of several agents building MISSION 3 \"VOLCANO ISLAND\" for Robot Rumble, a Metal Slug-style pixel-art run-and-gun game a parent is making for their two children (ages 8-10). Heroes Ines or Mathias. Missions 1 (ROBOT JUNGLE) and 2 (VIGO HILLS) exist. The parent approved a proposal of four painted screens and asked us to build it.\n\nREAD FIRST, fully:\n- /Users/macbookair/game/docs/level3-s…",
+      "promptFramed": true,
+      "lastProgressAt": 1794402233681,
+      "tokens": 577174,
+      "toolCalls": 161,
+      "durationMs": 8124540,
+      "resultPreview": "{\"file\":\"/Users/macbookair/game/src/level3_enemies.js\",\"exports\":[\"ENEMY_TYPES.shark\",\"ENEMY_TYPES.lavashark\",\"ENEMY_TYPES.frog\",\"EB_TYPES.lavabomb\",\"L3.lavaBomb(tx)\"],\"summary\":\"level3_enemies.js is written and tested (1649 lines). The layout follows the spec: 'use strict'; var L3 = L3 || {}; then one block. The art comes from the proposal frames and is drawn into crisp outlined sprites once at l…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "build:bees",
+      "phaseIndex": 2,
+      "phaseTitle": "Build",
+      "agentId": "a55734490ea37ebae",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794394106913,
+      "queuedAt": 1794394106435,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "/Users/macbookair/game/src/level3_bees.js",
+      "promptPreview": "You are one of several agents building MISSION 3 \"VOLCANO ISLAND\" for Robot Rumble, a Metal Slug-style pixel-art run-and-gun game a parent is making for their two children (ages 8-10). Heroes Ines or Mathias. Missions 1 (ROBOT JUNGLE) and 2 (VIGO HILLS) exist. The parent approved a proposal of four painted screens and asked us to build it.\n\nREAD FIRST, fully:\n- /Users/macbookair/game/docs/level3-s…",
+      "promptFramed": true,
+      "lastProgressAt": 1794400803227,
+      "tokens": 456056,
+      "toolCalls": 149,
+      "durationMs": 6694130,
+      "resultPreview": "{\"file\":\"/Users/macbookair/game/src/level3_bees.js\",\"exports\":[\"ENEMY_TYPES.bee\",\"ENEMY_TYPES.hive\",\"ENEMY_TYPES.queenbee (boss: true, bossName 'QUEEN BEE'; its death ends with e.dead = true and never calls bossDefeated)\",\"EB_TYPES.stinger\",\"ITEMS.honey\"],\"summary\":\"I wrote the file as one 'use strict' block with no L3 hooks, so it has no `var L3` line. The pixel-buffer and shaded-part painters co…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 5,
+      "label": "build:boss",
+      "phaseIndex": 2,
+      "phaseTitle": "Build",
+      "agentId": "acf0d841611b62962",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794394106913,
+      "queuedAt": 1794394106436,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "/Users/macbookair/game/src/level3_boss.js",
+      "promptPreview": "You are one of several agents building MISSION 3 \"VOLCANO ISLAND\" for Robot Rumble, a Metal Slug-style pixel-art run-and-gun game a parent is making for their two children (ages 8-10). Heroes Ines or Mathias. Missions 1 (ROBOT JUNGLE) and 2 (VIGO HILLS) exist. The parent approved a proposal of four painted screens and asked us to build it.\n\nREAD FIRST, fully:\n- /Users/macbookair/game/docs/level3-s…",
+      "promptFramed": true,
+      "lastProgressAt": 1794401653196,
+      "tokens": 536194,
+      "toolCalls": 171,
+      "durationMs": 7544114,
+      "resultPreview": "{\"file\":\"/Users/macbookair/game/src/level3_boss.js\",\"exports\":[\"ENEMY_TYPES.megawhale (boss: true, bossName 'MEGA WHALE SHARK', hp 450, contact 'none', edge 16; make() moves the wave entry (x 6216) into the crater lake at lock.at + 330, y 238)\",\"EB_TYPES.mwrock (spat lava rock: shootable, r 7, lands on its marked spot)\",\"EB_TYPES.mwdrop (breach lava drop: shootable, r 5, marked)\",\"EB_TYPES.mwfx (h…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 6,
+      "label": "build:sky",
+      "phaseIndex": 2,
+      "phaseTitle": "Build",
+      "agentId": "ab2602160979ced2d",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794394106913,
+      "queuedAt": 1794394106437,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "/Users/macbookair/game/src/level3_sky.js",
+      "promptPreview": "You are one of several agents building MISSION 3 \"VOLCANO ISLAND\" for Robot Rumble, a Metal Slug-style pixel-art run-and-gun game a parent is making for their two children (ages 8-10). Heroes Ines or Mathias. Missions 1 (ROBOT JUNGLE) and 2 (VIGO HILLS) exist. The parent approved a proposal of four painted screens and asked us to build it.\n\nREAD FIRST, fully:\n- /Users/macbookair/game/docs/level3-s…",
+      "promptFramed": true,
+      "lastProgressAt": 1794401515070,
+      "tokens": 566623,
+      "toolCalls": 146,
+      "durationMs": 7405970,
+      "resultPreview": "{\"file\":\"/Users/macbookair/game/src/level3_sky.js\",\"exports\":[\"L3.skyLoad(cp): builds the art once (first Mission 3 load), resets and pre-warms the particles\",\"L3.skyUpdate(): counts L3.eruptT down by 1 per frame, refreshes the weather, steps the particles\",\"L3.drawBG(cx): picks the backdrop from the camera x, with mist transitions T1 1950-2250, T2 3420-3860, T3 4950-5290\",\"L3.drawOverlay(cx): lig…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 7,
+      "label": "build:world",
+      "phaseIndex": 2,
+      "phaseTitle": "Build",
+      "agentId": "a44edd56569090a2a",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794394106913,
+      "queuedAt": 1794394106438,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "/Users/macbookair/game/src/level3_world.js",
+      "promptPreview": "You are one of several agents building MISSION 3 \"VOLCANO ISLAND\" for Robot Rumble, a Metal Slug-style pixel-art run-and-gun game a parent is making for their two children (ages 8-10). Heroes Ines or Mathias. Missions 1 (ROBOT JUNGLE) and 2 (VIGO HILLS) exist. The parent approved a proposal of four painted screens and asked us to build it.\n\nREAD FIRST, fully:\n- /Users/macbookair/game/docs/level3-s…",
+      "promptFramed": true,
+      "lastProgressAt": 1794401656807,
+      "tokens": 580853,
+      "toolCalls": 188,
+      "durationMs": 7547717,
+      "resultPreview": "{\"file\":\"/Users/macbookair/game/src/level3_world.js\",\"exports\":[\"L3.worldLoad(cp)\",\"L3.worldUpdate()\",\"L3.drawBehind(cx)\",\"L3.drawGround(cx)\",\"L3.drawPlat(pl)\",\"L3.drawFront(cx)\",\"PROP_TYPES.palm\",\"PROP_TYPES.beachrock\",\"L3.worldBakeMs (debug only: the last bake's wall time in ms)\"],\"summary\":\"The Mission 3 world layer is written: 2148 lines in one block, and the only global it adds is L3. Static …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 8,
+      "label": "build:level",
+      "phaseIndex": 2,
+      "phaseTitle": "Build",
+      "agentId": "a4f9de58676796345",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794400804026,
+      "queuedAt": 1794394106438,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "/Users/macbookair/game/src/level3.js",
+      "promptPreview": "You are one of several agents building MISSION 3 \"VOLCANO ISLAND\" for Robot Rumble, a Metal Slug-style pixel-art run-and-gun game a parent is making for their two children (ages 8-10). Heroes Ines or Mathias. Missions 1 (ROBOT JUNGLE) and 2 (VIGO HILLS) exist. The parent approved a proposal of four painted screens and asked us to build it.\n\nREAD FIRST, fully:\n- /Users/macbookair/game/docs/level3-s…",
+      "promptFramed": true,
+      "lastProgressAt": 1794405616133,
+      "tokens": 480782,
+      "toolCalls": 148,
+      "durationMs": 4811992,
+      "resultPreview": "{\"file\":\"/Users/macbookair/game/src/level3.js\",\"exports\":[\"LEVELS[2] (VOLCANO ISLAND): the skeleton's data, hooks and wiring are unchanged; the intro is now 300 frames\",\"POW_KINDS.turtle, .pelican, .parrot, .monkey, .toucan, .iguana, .flamingo (thanks 'THANK YOU!', each with its own call in onFree)\",\"TRACKS.island, TRACKS.whaleboss, plus TRACKS.islandlava (the minor lava version, switched in by le…"
+    }
+  ],
+  "totalTokens": 4104313,
+  "totalToolCalls": 1219
+}

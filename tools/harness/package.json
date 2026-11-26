@@ -1,0 +1,15 @@
+{
+  "name": "harness",
+  "version": "1.0.0",
+  "description": "Runs the real game headless: the files of `/Users/macbookair/game/src/manifest.json` are loaded in order into one Node `vm` context with stub browser globals (`document.createElement('canvas')` and the 480×270 `#game` canvas are `@napi-rs/canvas` canvases; no audio, no speech, in-memory `localStorage`, `requestAnimationFrame` does nothing). The harness then calls the game's own `update()` / `draw()`. Node 22; `@napi-rs/canvas` is installed in this folder.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@napi-rs/canvas": "^1.1.0"
+  }
+}

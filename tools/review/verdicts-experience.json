@@ -1,0 +1,505 @@
+{
+ "verdicts": [
+  {
+   "ids": [
+    "art-1"
+   ],
+   "title": "MEGA BEAR strobes between its art and a white silhouette at the fire rate (14.5 Hz with the H.M.G., 6.6 Hz with the pistol)",
+   "verdict": "confirmed",
+   "severity": "major",
+   "files": [
+    "src/level2_boss.js"
+   ],
+   "reproduced": "W/fx/flash.js (+cfg-hmg.js etc.) at --level 2 --x 5921.6 --god, fire held, frames 300-900 (W = H/work/verify-experience): H.M.G. 14.5 white onsets/s with 49% of frames white; pistol held 6.6/s (22%), pistol mashed 7.4/s. Cause confirmed in code: updateEnemies decrements hitT before updateBullets sets hitT = 4, so drawBear's `FLASH = e.hitT > 2` (line 737) shows exactly 2 white frames per hit; H.M.G. cd 4 gives a 2-on/2-off 15 Hz square wave. S/strobe-sheet.png (frames 400-407, S = H/shots/verify-experience) shows the whole bear silhouette alternating white and brown. Mission 1's crab (hitT > 0) under the H.M.G. only gives 1.4 onsets/s because it stays white. Patched copy W/var/flashfix.html: 2.4/s (H.M.G.) and 2.2/s (pistol), and boss hp at frame 900 is identical (321 / 411), so the change is draw-only. With the K1 fix more children reach the boss holding the H, so this becomes the common case.",
+   "fix": "level2_boss.js drawBear, line 737: replace `FLASH = e.hitT > 2;` with two lines: `if (e.hitT >= 3 && G.t - (e.flashAt ?? -99) >= 24) e.flashAt = G.t;` and `FLASH = G.t - (e.flashAt ?? -99) < 2;` This gives a 2-frame flash at most every 24 frames (2.5/s). Sparks, clank sounds and plate debris still mark every hit. Do not touch engine.js. Test: use a fixture that gives the weapon, holds X, calls draw() every frame and counts frames with G.t - flashAt < 2 between frames 300 and 900 at --x 5921.6. The target is at most 3 onsets/s for hmg, pistol (held and mashed), flame and the tractor gun. Boss hp at frame 900 must equal the unpatched build (seed 1: 321 with the H.M.G., 411 with the pistol). Then run sims --level 2 seeds 1-5 and check errors [].",
+   "effort": "small",
+   "risk": "Draw-only change in a Mission 2 file. No sim change and Mission 1 is untouched. Hits on the boss look slightly less flashy."
+  },
+  {
+   "ids": [
+    "kids-4",
+    "K1"
+   ],
+   "title": "Freed animals drop their item behind the hero: the H meant for the MEGA BEAR is lost, every time for tractor riders",
+   "verdict": "confirmed",
+   "severity": "major",
+   "files": [
+    "src/level2.js",
+    "src/engine.js"
+   ],
+   "reproduced": "W/fx/iobs.js wraps dropItem, ITEMS[k].collect and item removal; run with sims --level 2 seeds 1-3. In 3 of 3 runs the H dropped at 5550 when the tractor was already at ~5614 (64 px past) and was removed 1.6 s later (hero at 5766). The S dropped at 550 in front of the hero (the cage was shot from range) and was lost only because the hopping bot jumped over it. That part of K1 is a bot artifact and is refuted. B, R and F were collected. engine.js updatePows calls dropItem(o.item, o.x - 10, ..., -1) at salute frame 40. Mission 1 prisoners use the same code. Patched copy W/var/toss.html (level2.js only): S, R, F and H were collected in 3 of 3 seeds, the H at ~5615 while riding.",
+   "fix": "Mission-2-only fix; engine.js stays unchanged because Mission 1 uses the same drop. In level2.js VIGO.update(), after `if (L2.worldUpdate) L2.worldUpdate();`, add: `for (const it of G.items) { if (it.t !== 1 || it.tossed) continue; it.tossed = true; if (!G.pows.some(o => o.state === 'salute' && o.t === 40 && Math.abs(o.x - 10 - (it.x - it.vx)) < 2)) continue; const p = G.p, T = 38, v = p.ride ? p.ride.vx : p.vx; it.vy = -3.4; it.vx = clamp((p.x + v * T - it.x) / T, -4, 4); }`. This re-throws the one-frame-old animal item to where the hero will be in about 38 frames. Crate drops are left alone. Test: run sims --level 2 seeds 1-5 with both heroes; errors must be []. An item observer like iobs.js must show the S and the H collected in every run. Mission 1 sims must stay identical. Ship this together with the kids-3 reorder, because pickups inside the tractor overwrite each other, and with art-1.",
+   "effort": "small",
+   "risk": "level2.js only. Mission 2 sims change: stronger weapons and shorter runs (154-169 s instead of ~180 s in my plan runs). Mission 1 is unaffected."
+  },
+  {
+   "ids": [
+    "kids-3",
+    "kids-9"
+   ],
+   "title": "Rockets are never fired and the flame lasts 6 s, because weapon letters collected inside the tractor overwrite each other",
+   "verdict": "confirmed",
+   "severity": "major",
+   "files": [
+    "src/level2.js",
+    "src/weapons_extra.js",
+    "docs/level2-spec.md"
+   ],
+   "reproduced": "W/fx/wobs.js on sims seeds 1-3: the rockets were picked up at ~3150 and the flame at ~4540, both while riding (tractor boarded at 2950 and ridden to ~6055). Shots fired: pistol 420-480, flame 120 (6 s at cd 3), rockets 0. Items are collected through the ride's box (engine.js updateItems uses pbox). With only the K1 toss plus a pony R / cow B swap (W/var/swaptoss.html), rockets were fired in 3 of 5 seeds, but the H (5560) then overwrote the F inside the tractor, so the flame went unused in 4 of 5. kids-9's shotgun part is refuted: the ~100 px range (17 frames \u00d7 7.5 px with 0.955 drag, plus the muzzle) is what the spec asks for.",
+   "fix": "In level2.js pows (lines 104-107) change four items. Sheep 1550: 'F' (was heart). Pony 2300: 'R' (was B). Cow 3200: 'B' (was R). Goat 4600: 'heart' (was F). Keep dog 560 'S' and dog 5560 'H'. Then S, F and R are all collected and used on foot before the tractor, and the last pickup before the boss is the H even for riders. In weapons_extra.js line 533 set the flame to ammo 240 and maxAmmo 300 (12 s of held fire, like the other weapons). Update the comment above pows and the Rescues line in docs/level2-spec.md. Optional: in vehicle.js rideHud, draw weaponOf(G.p.weapon).icon next to TRACTOR. Already tested with the K1 toss in W/var/plan.html: seeds 1-5 all completed with 0 continues in 154-169 s. S was used in 5/5 runs, F in 5/5 (107-221 shots), R was picked up and fired in 3/5 (the bot jumped over the crate in 2/5), and the H was used at the boss in 5/5. Re-run 20 or more seeds with both heroes. Also check that the ROBO BEAR lock is not trivial with rockets and that K10 does not show up at 2250 (that lock has no eagles).",
+   "effort": "small",
+   "risk": "Mission 2 only; the flame weapon exists only in Mission 2. It changes the spec's weapon order, and the woods and the ROBO BEAR get easier with rockets."
+  },
+  {
+   "ids": [
+    "kids-2"
+   ],
+   "title": "On foot, the MEGA BEAR swipe can't be escaped by a child pressed against the bear",
+   "verdict": "confirmed",
+   "severity": "major",
+   "files": [
+    "src/level2_boss.js"
+   ],
+   "reproduced": "W/fx/lab-swipe.js forces e.state = 'swipe' with the hero d px left of the wall and holds Left from rt frames after the growl. At 0-5 px from the wall the hero escapes only with rt \u2264 5 (0.08 s). At 10-15 px it needs rt \u2264 10, at 20 px rt \u2264 15, at 30 px rt \u2264 20. Walking plus jumping gives identical results (the zone is 70 px tall and the jump peaks at ~56 px). Geometry: the wall keeps the hero's box right edge at e.x - 86, and the zone is e.x - 136 to e.x - 86. Escaping takes 50 px, or 29 frames of walking, before the damage window at st 35-42. The swipe triggers while p.x > e.x - 132. Variant W/var/swipe10.html (REACH 120, glint hold 10 frames longer): from the wall rt \u2264 20 is ok (rt 25 is hit), at 5 px rt \u2264 25, and from 10 px on every rt \u2264 30 is ok. The reviewer's variant with all keys +7 (W/var/swipe.html) gave wall rt \u2264 20 and 10 px rt \u2264 25.",
+   "fix": "level2_boss.js: set REACH to 120 (line 157, was 136). In rig() case 'swipe' (line ~542), add 10 to every keyframe time \u2265 24 in bx, th, by, jaw, phi, k and pa; the raise (0-24) is unchanged and the claw-glint hold becomes 24-44. Also set `eye = st < 46`, show the smear while st >= 44 && st < 60 with t: st - 44, and glint while st >= 22 && st < 44. In stepSwipe (line 909) keep the growl at 1 and the glint sound at 24. Move the whoosh from 35 to 45, the damage window from st 35..42 to 45..52, the sparks from 39 to 49, and toIdle from 70 to 80. Test with a lab like lab-swipe.js: rt \u2264 20 from the wall and rt \u2264 30 from 10 px must be ok. Then sims --level 2 seeds 1-5 must have errors [] and a boss fight still within 45-75 s.",
+   "effort": "small",
+   "risk": "Mission 2 boss only. REACH also changes how close the bear prowls (toIdle tx = p.x + REACH + 8) and narrows the swipe trigger to within 24 px of the wall."
+  },
+  {
+   "ids": [
+    "kids-8",
+    "K2"
+   ],
+   "title": "No checkpoint before the MEGA BEAR: a game over costs 31-37 s of orchard on foot plus the whole fight",
+   "verdict": "confirmed",
+   "severity": "minor",
+   "files": [
+    "src/level2.js",
+    "docs/level2-spec.md"
+   ],
+   "reproduced": "W/fx/bosslock.js with sim --level 2 --x 4460, seeds 1-3: the boss lock was reached after 36.6, 33.7 and 30.8 s on foot (a continue does not rebuild the tractor). Seed 1 lost a life on the way. Mission 1's last checkpoint (4400) is 220 px from its boss lock (4620); Mission 2's is 1320 px from 5720. loadLevel(cp) needs cp to equal a section x.",
+   "fix": "In level2.js SECTIONS (line 21) add { x: 5450, name: 'FINAL AREA: THE BIG CHERRY TREES' } and rename the 4400 entry 'AREA 4: CHERRY ORCHARD'. The names are the parent's call. A continue then rebuilds with the camera at 5450, the hero at 5510 and the dog cage at 5560 (the H again), with no spawns (the last one is at 5300) and the boss lock still ahead. Test: flow-selftest (it uses sections[1]) must stay 18/18. Force a game over after the boss lock and press Enter: the game must restart with the camera at 5450, music vigo, then bearboss at the lock. Sims seeds 1-5 must have errors []. Update the layout table in docs/level2-spec.md.",
+   "effort": "small",
+   "risk": "Mission 2 only. A new area banner shows at x 5480 in normal play, and the harness's hitsBySection gets 5 entries."
+  },
+  {
+   "ids": [
+    "kids-1"
+   ],
+   "title": "In the battle tractor the MEGA BEAR's swipe, lasers and shockwaves can't be avoided, yet the screen tells the rider DUCK! / JUMP!",
+   "verdict": "confirmed",
+   "severity": "minor",
+   "files": [
+    "src/level2_boss.js",
+    "src/vehicle.js"
+   ],
+   "reproduced": "W/fx/lab-tractor-boss.js (tractor pushed into the wall, attacks forced): the swipe hits at 0-10 px from the wall even with an instant reverse, and at 20 px only rt \u2264 5 escapes. The HIGH laser hits when standing, hopping or holding Down; only Down+Z avoids it, by ejecting the hero. W/fx/lab-tractor-hop.js: the hop windows for the LOW laser and the pound wave are 1-2 sampled frames (step 2). drawHint (line 1152) shows DUCK!/JUMP! whatever p.ride is, and RIDES.tractor.box is a fixed 48\u00d740. I downgraded this from major: the hits cost tractor armour (6), not hearts, and when the tractor explodes the hero carries on on foot with invulnerability.",
+   "fix": "level2_boss.js: (1) nextAttack, line 788: add `!p.ride &&` to the swipe condition (`if (!p.dead && !p.ride && p.x > e.x - REACH + 4 && e.last !== 'swipe') return 'swipe';`), because the tractor cannot reverse 50 px in time. (2) drawHint, line 1152: `if (!p || p.dead || p.ride) return;` so riders never get an instruction they can't follow. An alternative for the parent to decide: park the tractor automatically at x 5600 ('TRACTOR PARKED!') so the boss is always fought on foot, which also removes K4. Test: with a lab like lab-tractor-boss.js, put a rider at the wall, run 3000 fight frames and assert that no 'swipe' state starts while p.ride. Render a HIGH laser with a rider and check there is no DUCK! text. Sims seeds 1-5 must have errors [].",
+   "effort": "small",
+   "risk": "Mission 2 boss only. The tractor lasts a little longer at the boss."
+  },
+  {
+   "ids": [
+    "kids-5"
+   ],
+   "title": "Wolf pounce: a quick reflex jump lands on the skidding wolf and is hurt",
+   "verdict": "confirmed",
+   "severity": "minor",
+   "files": [
+    "src/level2_enemies.js"
+   ],
+   "reproduced": "W/fx/lab-wolf.js puts a wolf into crouch (st 0) at 40, 60 and 72 px, targeting the hero's x, and the hero jumps at frame j. Safe jumps: j 18-30, 17-34 and 17-37. Jumps at j 9-17 are hit in state 'skid'. Jumps at j 0-8 and late jumps are hit by the pounce. The contact rule at level2_enemies.js:511 hurts during skid while st < 8.",
+   "fix": "level2_enemies.js line 511: `contact: e => e.state === 'pounce' || e.state === 'run' ? 'hurt' : 'none',`. The skid no longer hurts; a hero standing still is already hit by the pounce itself. Test: in the same lab the safe window must start at frame 10 or earlier for all three distances. Sims seeds 1-5 must have errors [].",
+   "effort": "small",
+   "risk": "Mission 2 wolves only, including the boss's called wolves. Slightly fewer hits."
+  },
+  {
+   "ids": [
+    "kids-6"
+   ],
+   "title": "ROBO BEAR charge: 'jump over it' only works in a 5-6 frame window up close",
+   "verdict": "confirmed",
+   "severity": "minor",
+   "files": [
+    "src/level2_enemies.js"
+   ],
+   "reproduced": "W/fx/lab-charge.js (pawing starts at st 0 at 70, 110 and 150 px; the charge starts at st 44). ROBO BEAR, jump in place: ok for 6, 5 and 15 frames. Jump toward it: 15, 14 and 15 frames. Walking away is always ok. The normal bear in place: 13, 12 and 21 frames. The charge box at line 1125 is 48S \u00d7 30S, which for the ROBO BEAR (S 1.25) is 60 \u00d7 37.5 px, against a jump peak of ~56 px.",
+   "fix": "level2_enemies.js line 1125: `if (e.state === 'charge') return { x: e.x - 20 * S, y: e.y - 24 * S, w: 40 * S, h: 24 * S };`. Standing shots at feet-19 still hit. Test: in lab-charge.js the ROBO BEAR jump-in-place window must be at least 10 frames at 70-110 px. Sims seeds 1-5 must have errors [].",
+   "effort": "small",
+   "risk": "Mission 2 bears only. The ROBO BEAR lock gets a little easier."
+  },
+  {
+   "ids": [
+    "audio-2"
+   ],
+   "title": "Rescued animals' calls are buried under the fight at most rescues",
+   "verdict": "confirmed",
+   "severity": "minor",
+   "files": [
+    "src/level2.js"
+   ],
+   "reproduced": "I rebuilt the audio chain offline: W/snd/synth.mjs re-implements Snd.tone, Snd.noise and the Music scheduler, and W/snd/sndlog.js logs every call; numbers agree with the audio review within ~1 dB. I compared each call with everything else playing, in the call's own third-octave bands at the real rescue moments (an.mjs cue), seeds 1-3. Sheep -13.5 / -10.5 / -9.3 dB, cow -15.7 / -11.5 / -11.6, goat -1.9 / -8.8 / -8.9, pony -0.2 / -10.2 / -13.3. The hen (+2.9 to +6.6) and the dog before the boss (+7 to +21) are heard. The freed jingle is above the rest 18 of 21 times (median +5.7). Volumes at level2.js:450-455 are sawtooth 0.04-0.045.",
+   "fix": "level2.js SOUNDS (lines 450-455), about +9 dB. Sheep and goat tones: 0.045 \u2192 0.13. Pony: 0.04 \u2192 0.12. Cow: 0.07 / 0.04 / 0.05 / 0.03 \u2192 0.15 / 0.09 / 0.11 / 0.07. Dog tones: 0.09 \u2192 0.14, and its noise 0.06 \u2192 0.1. Hen: 0.06 \u2192 0.08. Test: log sounds and check each call stays below the shotgun blast's peak. A by-ear check in a browser is advisable.",
+   "effort": "small",
+   "risk": "Mission 2 only; no gameplay effect."
+  },
+  {
+   "ids": [
+    "audio-1"
+   ],
+   "title": "The flamethrower is nearly silent while held",
+   "verdict": "confirmed",
+   "severity": "minor",
+   "files": [
+    "src/weapons_extra.js"
+   ],
+   "reproduced": "W/snd/wl.mjs on a flame sandbox (3 wolves, god mode, fire held, busiest 3 s): the flame's own sounds measure -47.5 LUFS (laptop model -51.3), against pistol -40.6, H.M.G. -39.9 and music -39.0. Only the hiss plays while fire is held (line 544: noise 0.2 s at 0.08 every 9 frames); the whoosh (line 543) only plays when the trigger is pressed again. The reviewer's fix measured -40.2 in my synth.",
+   "fix": "weapons_extra.js line 544: `if (G.t - hissT >= 6) { hissT = G.t; Snd.noise(0.3, 0.25, 1500); }`. Optionally add `Snd.noise(0.3, 0.15, 2000);` to the start whoosh on line 543 so it survives laptop speakers. Test: in a logged sandbox the sustained flame should be about pistol level (-41 \u00b1 2 LUFS with the same measurement).",
+   "effort": "small",
+   "risk": "Mission 2 weapon only."
+  },
+  {
+   "ids": [
+    "audio-5"
+   ],
+   "title": "The battle tractor makes no engine sound while driving",
+   "verdict": "confirmed",
+   "severity": "minor",
+   "files": [
+    "src/vehicle.js"
+   ],
+   "reproduced": "The only running sound is the exhaust puff at vehicle.js:496 (square 70\u219250 Hz, 0.05 s, vol 0.02, every ~9 frames with the throttle open). It measures -57.2 LUFS-M per puff and -59 sustained (laptop model -64), against the music at -39. The engine start (line 524) plays once.",
+   "fix": "vehicle.js line 496: `if (!quiet) { Snd.tone('sawtooth', hard ? 110 : 95, 70, 0.1, hard ? 0.15 : 0.12); Snd.noise(0.09, hard ? 0.14 : 0.11, 1000); }`. Parked tractors stay quiet. My synth measures -42.3 sustained (laptop model -45.9): under the music and the gun. Test: in a logged ride the engine must stay below the tractor gun's level.",
+   "effort": "small",
+   "risk": "Mission 2 only."
+  },
+  {
+   "ids": [
+    "audio-3"
+   ],
+   "title": "Wind-up warning sounds (wolf growl, MEGA BEAR grunt, rise and growl) are masked by the music's bass",
+   "verdict": "confirmed",
+   "severity": "minor",
+   "files": [
+    "src/level2_enemies.js",
+    "src/level2_boss.js"
+   ],
+   "reproduced": "an.mjs cue, seeds 1-3. Wolf growl (level2_enemies.js:235): median -5.6 / -10.3 / -6.0 dB, louder than the rest in 0 of 36 cases. MEGA BEAR grunt (level2_boss.js:756) \u2248 -10. Rise (760): -9 / -3.4 / -5.5. Growl (758): -12 / -13 / -5. Laser whine (764): -8.5 to -11. The laser charge is \u2248 0. Their energy sits at 46-160 Hz, under the music's bass and kick. One correction to the review: the eagle 'dive' sound (705) is the attack itself, not the tell, and the review itself measured the screech tell as audible. The visual tells stay clear, so this is a bonus cue.",
+   "fix": "Use the replacements tested in the audio review (keep the low part and add a mid layer, +4 to +8 dB). level2_enemies.js:235 growl: `for (let i = 0; i < 5; i++) { Snd.tone('sawtooth', 300 - i * 10, 200, 0.08, 0.13, i * 0.09); Snd.noise(0.07, 0.1, 1500, i * 0.09); }`. level2_boss.js:756 grunt: `Snd.tone('sawtooth', 260, 150, 0.3, 0.25); Snd.tone('square', 130, 80, 0.28, 0.08); Snd.noise(0.22, 0.22, 1600);`. Line 760, rise: `Snd.tone('sawtooth', 120, 420, 0.5, 0.2); Snd.noise(0.5, 0.18, 1400);`. Line 758, growl: tones from 184 + i * 12 down to 140 at vol 0.2. Line 764, whine: vol 0.05 \u2192 0.1. Test: re-run the cue measurement on 3 seeds; aim for a median of at least -3 dB, with no new clipping.",
+   "effort": "small",
+   "risk": "Mission 2 only."
+  },
+  {
+   "ids": [
+    "audio-4"
+   ],
+   "title": "MEGA BEAR thuds and tremors and the bears' footsteps are sub-bass only and vanish on laptop speakers",
+   "verdict": "confirmed",
+   "severity": "minor",
+   "files": [
+    "src/level2_boss.js",
+    "src/level2_enemies.js"
+   ],
+   "reproduced": "an.mjs iso, full range \u2192 laptop model (4th-order 180 Hz high-pass), momentary max. MEGA BEAR thud (level2_boss.js:755): -36.6 \u2192 -55.6. Rumble (768): -34.2 \u2192 -54.1. Bear heavy step (level2_enemies.js:243): -39.2 \u2192 -57.5. Tractor landing: -37.7 \u2192 -49.1. Mission 1's boom only drops -31.4 \u2192 -37.9. Boss music on the same model is about -41.5. Caveat: the laptop model is a filter, not a measured MacBook Air speaker.",
+   "fix": "Add a mid crunch layer (tested in the audio review, +0.7 dB full range). level2_boss.js sfx.thud(v) (line 755): `Snd.tone('square', 160, 80, 0.14, 0.1 * v); Snd.noise(0.16, 0.3 * v, 1200);`. sfx.rumble (line 768): `Snd.noise(0.6, 0.3, 800); Snd.tone('sawtooth', 80, 50, 0.6, 0.08);`. level2_enemies.js SFX.heavy (line 243): `Snd.tone('square', 150, 75, 0.1, 0.07); Snd.noise(0.1, 0.2, 1200);`. Optionally do the same for the tractor landing (vehicle.js:562). Test: the same isolated measurement through the high-pass, with the thud at -46 or louder on the laptop model.",
+   "effort": "small",
+   "risk": "Mission 2 only."
+  },
+  {
+   "ids": [
+    "art-11",
+    "K14"
+   ],
+   "title": "The battle tractor is drawn rotated 2\u00b0 (jagged) on the whole orchard hill, not only on steep slopes",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/vehicle.js"
+   ],
+   "reproduced": "W/fx/tractor.js pushes a tractor prop under the hero at --x 4251.6 and drives right. The drawn tilt is non-zero on 1030 of 1060 ride frames (x 4264-5021, ~17 s) and on 0 frames on the farm (2950-3358). Variant W/var/tilt.html (threshold 0.045) has 0 tilted frames. S/tilt-sheet.png: the stair-stepped canopy, hood and seated hero become pixel-exact, and the wheels still sit on the ground.",
+   "fix": "vehicle.js line 367: `const tilt = rot => Math.abs(rot) < 0.045 ? 0 : Math.round(rot / 0.035) * 0.035;` (threshold was 0.025). Test: render the tractor on the orchard hill at --x 4251.6 with a fixture that boards and drives right (frames 300 and 500), and run sims seeds 1-5 (errors []).",
+   "effort": "small",
+   "risk": "tilt() also aims the nose gun and the cannon (dirOf uses v.rot), so on the hill they now fire level instead of 2\u00b0 up or down. That is a small Mission 2 gameplay change; Mission 1 is unaffected."
+  },
+  {
+   "ids": [
+    "kids-7"
+   ],
+   "title": "The tractor exit (\u2193+Z) is never shown, and 'JUMP!' over the wreck asks for nothing",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/vehicle.js",
+    "src/screens.js"
+   ],
+   "reproduced": "From the code. prompt() shows only 'GET IN!' and boardIt (line 817) only 'BATTLE TRACTOR!'. drawPause (screens.js:415) lists only the on-foot keys. wreck() pushes 'JUMP!' (vehicle.js:684) although exitRide(p, true) ejects the hero automatically and explode() uses blast(..., 'player'), which never hurts the hero. Partly refuted: the cannon is on C, the grenade key, with a shell counter in the HUD, and X, Up and Z work as they do on foot. So 'children don't find the cannon' is not supported; only the exit is hidden.",
+   "fix": "vehicle.js:684: change 'JUMP!' to 'BAIL OUT!' (or 'TRACTOR DOWN!'). In boardIt, inside `if (!r.hello)`, add `G.texts.push({ x: o.x, y: gl.y - 70, s: 'C: CANNON   DOWN+Z: GET OUT', t: 160, c: '#ffffff' });`. Optional: in screens.js drawPause, only when G.p && G.p.ride, draw an extra line 'TRACTOR: C CANNON  DOWN+Z GET OUT'. Test: render the boarding and the wreck. compare-screens.sh must still show Mission 1's pause screen pixel-identical.",
+   "effort": "small",
+   "risk": "vehicle.js is Mission 2 only. drawPause is shared, so keep the extra line conditional on a ride."
+  },
+  {
+   "ids": [
+    "audio-6"
+   ],
+   "title": "The shotgun is ~9 LU louder than the other guns, and its 5 pellets stack identical hit sounds",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/weapons_extra.js",
+    "src/engine.js"
+   ],
+   "reproduced": "wl.mjs sandboxes: the shotgun measures -31.5 LUFS sustained (peak -10.4 dBFS, no clipping), against pistol -40.6, H.M.G. -39.9, rockets -35.9 and music -39.0. In a shotgun-vs-bear sandbox there were 3, 2, 2 and 1 frames with 2, 3, 4 and 5 simultaneous hit sounds (engine.js:340/341). Five identical clanks sum to +14 dB in a synthetic test. Against wolves there was no stacking (2 pellets kill a wolf). The S is used for about 12 s of the mission.",
+   "fix": "weapons_extra.js line 290: `Snd.noise(0.32, 0.27, 1300); Snd.tone('sine', 160, 45, 0.28, 0.25); Snd.tone('square', 110, 55, 0.1, 0.06);`. The audio review measured -35.5, still the punchiest gun. Optional fix for the stacking: in engine.js damageEnemy, wrap the clank/hit sound in `if (e.sndT !== G.t) { e.sndT = G.t; ... }`. Test: a logged shotgun sandbox at -35 LUFS or quieter, and Mission 1 sims unchanged.",
+   "effort": "small",
+   "risk": "The volume change is Mission 2 only. The engine guard changes no sim or pixels, but it merges rare same-frame duplicate hit sounds in Mission 1 too. Skip it if exact Mission 1 sound parity is required."
+  },
+  {
+   "ids": [
+    "audio-7",
+    "K7"
+   ],
+   "title": "The gaita jig is not harsh but thin: its lead is 3.4 LU quieter than Mission 1's and its bass is weak on laptop speakers",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/audio.js",
+    "src/level2.js"
+   ],
+   "reproduced": "an.mjs music (the game's scheduler emulated from the Music.play log). Vigo: lead -51.6, bass -41.7 (laptop model -48.5), whole loop -38.9 (laptop -44.8). Mission 1 main: lead -48.2, bass -39.9 (laptop -44.6), loop -39.0 (laptop -43.0). This refutes K7's worry that the sawtooth lead is harsh; the real problem is that it is quiet and the low D2 drone is lost on laptops.",
+   "fix": "audio.js line 114: use `tr.leadVol || 0.11` as the lead volume. Mission 1 tracks have no leadVol, so they stay identical. level2.js TRACKS.vigo (line 901): add `leadVol: 0.16` and `bass: [50, 0, 57, 62, 0, 57]` (one octave up). Optional: check by ear in a browser.",
+   "effort": "small",
+   "risk": "audio.js is shared but behaves the same for tracks without leadVol."
+  },
+  {
+   "ids": [
+    "art-2"
+   ],
+   "title": "'MEGA BEAR DOWN!' is only a small 1x floating text at the climax",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/level2_boss.js"
+   ],
+   "reproduced": "W/fx/killboss.js kills the boss at frame 300. The text appears at frame 450 at screen (371, 102) and rises to y\u224853. S/bossdie-text.png: it is washed out for ~10 frames under the 0.6 white flash, then it reads clearly over the sky thanks to its 1px black shadow. 'Hard to read' is overstated; the text is just small for the payoff and in the same style as every pickup text.",
+   "fix": "level2_boss.js line 1012: replace the G.texts.push with `G.big = { s: 'MEGA BEAR DOWN!', t: 130 };`. That is the dark band with 3x yellow text used for MISSION START!; the text slides in over ~35 frames while the flash fades, and the win screen follows 210 frames later. Test: render the kill with a killboss.js-style fixture at frames 480-560.",
+   "effort": "small",
+   "risk": "Mission 2 only."
+  },
+  {
+   "ids": [
+    "art-3"
+   ],
+   "title": "In the downpour the eagles' grey wings are close in value to the storm sky",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/level2_enemies.js",
+    "src/level2_sky.js"
+   ],
+   "reproduced": "S/eagles-rain-sun.png (captures at x 3801.6, 3951.6 and 4101.6 compared with 3201.6 and 4851.6, 3x): the wing greys sit close to the cloud greys, but the 1px dark outline, white head, red eye and gold feet keep the bird readable. The diving pose is the weakest. 'Wings vanish' is overstated, and the red aim line still warns of the dive.",
+   "fix": "Optional. Either lighten the storm-cloud band at y 40-110 by about 15% in level2_sky.js, or in the eagle drawing in level2_enemies.js add a 1px METL (#c3cdd8) top edge to the wings while L2.weather().rain > 0.3. Test: renders at x 3801.6 and 3951.6, frames 60-260.",
+   "effort": "small",
+   "risk": "Mission 2 art only."
+  },
+  {
+   "ids": [
+    "art-4"
+   ],
+   "title": "A wolf in front of a bear merges with the bear's grey legs",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/level2_enemies.js"
+   ],
+   "reproduced": "S/wolf-bear.png (x 3801.6, frames 60 and 120): the wolf's body blends into the bear's MET/METD legs, while its red eye and cyan lights still mark it. drawWolfLeg and the bear's drawLeg both use `near ? MET : METD`.",
+   "fix": "Optional: in level2_enemies.js give the bear and ROBO BEAR legs a warm dark palette (#6a5a50 / #4a3c34 with a #8a7868 highlight) and leave the wolves unchanged (they also appear on the mission card). Test: render x 3801.6 at frames 60 and 120, and the 2250 lock.",
+   "effort": "small",
+   "risk": "Mission 2 art only."
+  },
+  {
+   "ids": [
+    "art-12",
+    "K3"
+   ],
+   "title": "Area crossfades double-expose the scenery for 300 px of camera travel",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/level2_sky.js",
+    "src/level2_world.js"
+   ],
+   "reproduced": "weights() (level2_sky.js:143) blends purely by the camera centre (BOUNDS [1350, 2850, 4400], FADE 150), so the blend shows for camera x 960-1260, 2460-2760 and 4010-4310, and no camera lock sits inside a band. S/full/c1110-f200.png shows woods trunks over the r\u00eda, which reads like mist. S/full/c4150-f200.png shows the bridge and fields ghosting. Soft rather than ugly; Mission 1 crossfades the same way.",
+   "fix": "Optional, cheapest: level2_sky.js line 141, FADE 150 \u2192 90. The blend then lasts ~1.8 s of walking instead of ~3 s, and the SCN ranges stay valid. Larger alternative from the art review: draw a solid front-layer gate in level2_world.js drawFront (big trunks or a hedge arch at 1290-1410 and 2790-2910, a stone gate at 4340-4460) and set FADE to about 70. Test: renders across each band in 30 px camera steps.",
+   "effort": "small",
+   "risk": "Mission 2 only."
+  },
+  {
+   "ids": [
+    "art-6"
+   ],
+   "title": "The Galician flag at x 2986 pops in at the right screen edge when the wind blows left",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/level2_world.js"
+   ],
+   "reproduced": "drawFlag (level2_world.js:1701) draws the cloth 22 px left of the pole when the wind is < -0.05, but REACH.flag is [4, 30] (line 1552). W/var/flag.html (REACH [26, 30]) against the base build at camera 2494, frame 400: 1440 px (3x) differ, because the cloth at the right edge is missing in the current build (S/pop-flag.png). At frame 1, with wind > -0.05, there is no difference.",
+   "fix": "level2_world.js line 1552: flag [4, 30] \u2192 [26, 30]. Test: harness diff at frame 400 for --x 2687.6 to 2703.6 against the patched copy.",
+   "effort": "small",
+   "risk": "None."
+  },
+  {
+   "ids": [
+    "art-8"
+   ],
+   "title": "Identical tree props repeat side by side",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/level2_world.js"
+   ],
+   "reproduced": "S/full/c2250-f60.png shows three identical chestnut canopies (props 2370, 2560 and 2690) on one screen. Every chestnut prop draws CHEST_TOP and every cherry CHERRY_TOP (level2_world.js:880-882, drawn at 2081 and 2141).",
+   "fix": "Optional: build mirrored copies of CHEST_TOP and CHERRY_TOP (and their white flash copies) at load and pick one by o.x, e.g. Math.round(o.x / 10) % 2. The canopy boxes are symmetric about o.x, so gameplay does not change. Test: renders at x 2451.6 and 4801.6.",
+   "effort": "small",
+   "risk": "Mission 2 art only. Check the swayBlit offsets on the mirrored copy."
+  },
+  {
+   "ids": [
+    "art-10"
+   ],
+   "title": "The soil colour changes along a faint vertical band at area borders",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/level2_world.js"
+   ],
+   "reproduced": "S/seams.png: a dithered palette switch is visible in the earth band at x 2850 (camera 2700) and barely at 1350 and 4400. zoneAt (level2_world.js:164-168) only jitters the border by \u00b116 px.",
+   "fix": "Optional: level2_world.js line 165: `const j = (nz(x >> 1, y >> 1) - 0.5) * 128;` (\u00b164 px). Test: renders at x 2901.6, 1551.6 and 4601.6.",
+   "effort": "small",
+   "risk": "Mission 2 ground only."
+  },
+  {
+   "ids": [
+    "art-7"
+   ],
+   "title": "Weather particles (butterflies, petals, rain) can cover the HELP! bubbles",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/level2_sky.js",
+    "src/level2.js"
+   ],
+   "reproduced": "Confirmed from the code only: screens.js drawPlay draws the pows (cage and bubble, level2.js ~533) before LV.drawOverlay. I did not see an overlap in a 16-frame sample (S/help-sheet.png); it is rare and brief.",
+   "fix": "Optional, low value: in the level2_sky.js overlay, skip butterflies and petals inside a tied cage's bubble rectangle (pow x-16 to x+17, from y - K.ch - 23 to y - K.ch - 12).",
+   "effort": "small",
+   "risk": "None."
+  },
+  {
+   "ids": [
+    "audio-8"
+   ],
+   "title": "The rain and the storm over the farm make no sound",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/level2_sky.js"
+   ],
+   "reproduced": "grep: level2_sky.js has no Snd, Music or say call, although weather() drives drizzle from ~3200 and a downpour at 3500-4000.",
+   "fix": "level2_sky.js L2.skyUpdate (line 1494, after weatherNow()): `if (WX.rain > 0.05 && T % 6 === 0) Snd.noise(0.3, 0.04 + 0.03 * WX.rain, 6000);`. The audio review measured about -47 LUFS in the drizzle and -43 in the downpour, under the music. Optional: a thunder clap every 9-12 s while WX.storm > 0.8. Test: log sounds while driving through 3200-4100.",
+   "effort": "small",
+   "risk": "Mission 2 only; skyUpdate does not run while paused."
+  },
+  {
+   "ids": [
+    "audio-9"
+   ],
+   "title": "The door creak in the opening scene is under the music",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/level2.js"
+   ],
+   "reproduced": "an.mjs cue on the intro: the creak (level2.js:657, sawtooth at 0.025-0.03 plus noise at 0.03) is -6.5 dB against the jig, which plays from frame 0. The door thud (+2.5), the eagle screeches (+7.4) and the chirps (+10.2) come through.",
+   "fix": "level2.js line 657: double the creak (tone volumes 0.06 / 0.06 / 0.05, noise 0.06). Alternative: call Music.stop() in the intro's start() and Music.play('vigo') at(IT.go); Enter jumps to IT.go, so the music still starts. With that alternative, re-run flow-selftest (18/18).",
+   "effort": "small",
+   "risk": "Mission 2 only."
+  },
+  {
+   "ids": [
+    "kids-11"
+   ],
+   "title": "The 5.6 s Mission 2 intro skips only on Enter and doesn't say so",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/level2.js"
+   ],
+   "reproduced": "From the code: the intro's update skips only on `pressed.Enter` while t > 10 && t < IT.go; Z and X do nothing; IT.end is 338 frames.",
+   "fix": "Optional: draw a small 'ENTER: SKIP' in the bottom letterbox bar after the caption fades (t > 130) in the intro's draw. Keep Enter-only, because Z and X would skip by accident. Test: render --level 2 --frames 200, and flow-selftest.",
+   "effort": "small",
+   "risk": "Mission 2 intro only."
+  },
+  {
+   "ids": [
+    "K8"
+   ],
+   "title": "The title screen tip still says FREE THE PRISONERS FOR POWER-UPS!",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/screens.js"
+   ],
+   "reproduced": "screens.js:144 draws this line on the shared title screen, but Mission 2 rescues animals.",
+   "fix": "screens.js:144: change the text to 'RESCUE EVERYONE FOR POWER-UPS!' (30 characters, fits the 248 px panel). Test: render --screen title. compare-refactor.sh will now show this intended title difference, while Mission 1 gameplay frames stay identical.",
+   "effort": "small",
+   "risk": "Shared screen: the title frame no longer matches the pre-Mission-2 build (intended)."
+  },
+  {
+   "ids": [
+    "art-9"
+   ],
+   "title": "Boss parts rotated to arbitrary angles show stair-stepped outlines",
+   "verdict": "confirmed",
+   "severity": "polish",
+   "files": [
+    "src/level2_boss.js"
+   ],
+   "reproduced": "part() (level2_boss.js:601-606) rotates any |ang| \u2265 0.03 on a rotated context. S/pound-sheet.png at 6x shows mild stair-steps on the reared arm. They are not visible at play size and show most on the white flash, which the art-1 fix makes rare.",
+   "fix": "No change recommended for this pass (large effort, invisible to children). If wanted later: build pre-rotated copies in 8-16 steps at load time, as ROCKET_ROT does in weapons_extra.js, and snap |ang| < 0.06 to 0.",
+   "effort": "large",
+   "risk": "Risk of regressions in the boss art; skip."
+  },
+  {
+   "ids": [
+    "art-5"
+   ],
+   "title": "ROBO BEAR's thrown logs are brown on brown over the woods' trunks",
+   "verdict": "refuted",
+   "severity": "polish",
+   "files": [
+    "src/level2_enemies.js"
+   ],
+   "reproduced": "A seed-1 run at x 2451.6 with no input throws a log at frame 1311. S/logs-woods.png (frames 1314-1359, 3x): crossing the dark trunks, the log keeps its 1px dark outline and cream end ring and is readable in every frame.",
+   "fix": "No change needed.",
+   "effort": "small",
+   "risk": "None."
+  },
+  {
+   "ids": [
+    "kids-10"
+   ],
+   "title": "8-10 s with no robot on screen just before the MEGA BEAR",
+   "verdict": "refuted",
+   "severity": "polish",
+   "files": [
+    "src/level2.js"
+   ],
+   "reproduced": "The fact is right: spawns end with the wolf at 5180 and the eagle at 5300, and the boss lock is at camera 5720. But it is a normal calm before the boss, with the dog rescue (H), the cherry trees and the tremors to come, and the reviewer itself calls it mostly fine. With the kids-8 checkpoint at 5450, the walk after a continue is ~3 s.",
+   "fix": "No change needed.",
+   "effort": "small",
+   "risk": "None."
+  }
+ ],
+ "gaps": "1. No real-browser check by any reviewer. Every picture came from @napi-rs/canvas and every sound from offline re-implementations. Safari (the macOS default for a double-clicked .html) was never run. Unchecked there: the audio unlock on first key, the speechSynthesis voices and their loudness, K9's load hitch, and pixelated canvas scaling at the non-integer scale core.js resize() gives on a MacBook Air (~2.9-3.06x), which makes pixel columns uneven and shimmer while scrolling (Mission 1 too).\n2. No human playtest. All difficulty and fairness numbers come from idealised bots: fixed reactions, a bot that hops ~90% of the time, never walks to items, never pauses. Likely kid behaviours were only reasoned about: holding Right into the boss, mashing Down+Z (ejects from the tractor), shooting or not shooting cages.\n3. Cross-fix interactions were not looked at. Weapon letters collected inside the tractor overwrite each other (R\u2192F\u2192H), so any K1 toss fix makes the H wipe the F unless the pickups are reordered. A K1 fix also makes the art-1 boss strobe the common case. Only my plan variant W/var/plan.html tested them together.\n4. Speech: say() calls speechSynthesis.cancel(), so a rescue or pickup voice line can cut the previous one (e.g. 'Rocket launcher!' against 'Mission two, start!'). Speech loudness against the mix was not measured.\n5. Photosensitivity was only checked for the MEGA BEAR. Other hit flashes (the ROBO BEAR under pistol fire flashes ~6.7 Hz with hitT > 0, but over a small area) and the 15 Hz, 12% sflash pulses during the boss death were only partly measured.\n6. Colour-blind readability of the key cues (red aim lines and reticles, red HELP! on green, cyan/yellow laser hints, the green/yellow/red tractor armour bar) was not checked.\n7. After a continue from 4400 the tractor is not rebuilt, so the orchard and the boss are always on foot. Nobody judged whether kids miss the tractor there.\n8. Verification of any fix against Mission 1 identity was not planned for the shared files (engine.js, screens.js, audio.js) that some suggestions touch.",
+ "notes": "Method: every finding was re-checked with my own tools in the scratchpad. W = /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/work/verify-experience and S = /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/shots/verify-experience. W/cap.mjs is the harness plus a 'cap' mode for multi-frame PNGs. W/sheet.mjs and sheet2.mjs make contact sheets. W/mkvariant.py builds a single-file page from src with exact-string edits, run with --html. W/fx/*.js holds the labs and observers: flash, flash2, killboss, lab-swipe, lab-tractor-boss, lab-tractor-hop, lab-wolf, lab-charge, wobs, iobs, tractor, bosslock. The audio chain was rebuilt in W/snd: sndlog.js logs every call, synth.mjs re-implements Snd.tone, Snd.noise and the Music scheduler with BS.1770 loudness, a 180 Hz laptop high-pass model and a third-octave masking comparison, and an.mjs and wl.mjs run the analyses. My audio numbers match the audio review within ~1 dB. All runs had errors []. Running notes, safe from restarts: /Users/macbookair/game/tools/review/notes-verify-experience.md. I wrote nothing else under /Users/macbookair/game and never ran more than 3 sims at once.\n\nVerdicts: 30 confirmed and 2 refuted (art-5, kids-10). Downgraded: kids-1 from major to minor (it costs tractor armour, not hearts); art-2, art-3 and art-12 to polish (legible or soft in my renders). Partly refuted inside merged verdicts: the S part of K1 (a bot artifact), kids-9's shotgun range (it matches the spec), and the claim in kids-7 that kids won't find the cannon (it is on the grenade key).\n\nThe most important finding beyond the reviews: weapon letters picked up while riding replace each other. The K1 fix and the kids-3 fix therefore have to ship together, with the reordered pows (sheep F, pony R, cow B, goat heart) and the level2.js-only toss. That combination is tested in W/var/plan.html: 5/5 seeds completed, 0 continues, S, F and H always used, R used in 3/5.\n\nKnown issues not re-reported and skipped as not worth fixing for the kids: K4 (tractor easy, half machine-gun damage without feedback: fine for 8-10, and the boss bar still moves), K5, K6, K9, K11, K12, K13 (cosmetic, rare or invisible to children), and K10 (stays harmless when R moves to 2300: that lock has no eagles and rockets home below the chestnut canopy box). K8 is included as a polish fix.\n\nMission 1 safety: every recommended fix touches only Mission 2 files, except three optional ones. audio-6's engine.js sound guard changes no sim or pixels, only rare duplicate hit sounds. K8 is an intended title-text change. kids-7's pause line must stay conditional on a ride. The audio.js leadVol change keeps Mission 1 identical because its tracks have no leadVol."
+}

@@ -1,0 +1,20 @@
+{
+ "completed": false,
+ "state": "play",
+ "errors": [],
+ "hitsBySection": [
+  2,
+  236,
+  0,
+  0
+ ],
+ "deaths": 39,
+ "continues": 13,
+ "seconds": 489.3,
+ "frames": 30000,
+ "score": 10100,
+ "freed": 2,
+ "x": 2048,
+ "level": 4,
+ "warnings": []
+}

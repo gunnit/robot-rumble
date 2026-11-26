@@ -1,0 +1,34 @@
+{
+  "hits": [
+    0,
+    0,
+    2,
+    12
+  ],
+  "lives": 2,
+  "completed": true,
+  "hero": 0,
+  "seed": 1,
+  "useSub": false,
+  "boarded": false,
+  "frames": 7469,
+  "seconds": 124.5,
+  "deaths": 2,
+  "continues": 0,
+  "freed": 7,
+  "sections": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "modes": [
+    "scuba",
+    "dead"
+  ],
+  "score": 19800,
+  "x": 6392,
+  "errors": [],
+  "warnings": [],
+  "wallSeconds": 23.91
+}

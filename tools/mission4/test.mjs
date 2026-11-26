@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {boot} from './runtime.mjs';
+const e=boot(1,process.env.RR_HTML||null),g=e.get;
+assert.ok(g('LEVELS')[3], 'Mission 4 must be registered');
+const G=g('G');let checks=0;
+function check(name,fn){fn();checks++;console.log('PASS '+name);}
+const pos=(x=1000,y=160)=>{e.start(4,x);G.p.y=y;G.p.inv=500;G.enemies=[];G.locks=[];G.big=null;G.banner=null;};
+check('free vertical movement and water bounds',()=>{pos();const x=G.p.x;e.step(25,['up']);assert.ok(G.p.y<130);assert.equal(G.p.x,x);e.step(200,['up']);assert.ok(G.p.y>=50);e.step(200,['down']);assert.ok(G.p.y<=g('groundAt')(G.p.x));});
+check('neutral buoyancy and normalized diagonals',()=>{pos();e.step(25,['up']);e.step(30);const y=G.p.y;e.step(60);assert.ok(Math.abs(G.p.y-y)<.1);pos();const x=G.p.x;e.step(30,['right']);const straight=G.p.x-x;pos();e.step(30,['right','up']);assert.ok(Math.abs(Math.hypot(G.p.x-x,G.p.y-160)-straight)<1);});
+check('submarine Enter edges, parking and reboarding',()=>{pos(1800,155);const sub=G.props.find(o=>o.k==='oceansub');assert.ok(sub);G.p.x=sub.x;G.p.y=sub.y;e.step(1,['enter']);assert.equal(G.p.ride.type,'minisub');e.step(20,['enter']);assert.equal(G.p.ride.type,'minisub');e.step(1);e.step(1,['enter']);assert.equal(G.p.ride.type,'scuba');assert.ok(G.props.some(o=>o.k==='oceansub'));e.step(25);G.p.x=sub.x;G.p.y=sub.y;e.step(1,['enter']);assert.equal(G.p.ride.type,'minisub');});
+check('vehicle destruction ejects a protected swimmer',()=>{G.p.inv=0;const r=G.p.ride;r.hp=1;g('RIDES').minisub.hurt(G.p,r);assert.equal(G.p.ride.type,'scuba');assert.ok(G.p.inv>=100);e.step(40,['up']);assert.ok(Number.isFinite(G.p.y));});
+check('death and continue restore water controls',()=>{pos();G.p.hearts=1;G.p.inv=0;g('hurtPlayer')();assert.ok(G.p.dead);e.step(120);assert.equal(G.p.ride.type,'scuba');assert.ok(!G.p.dead);G.checkpoint=3400;G.state='over';g('continueGame')();e.step(2);assert.equal(G.p.ride.type,'scuba');assert.ok(G.p.y>=50);});
+check('pause freezes swimmer',()=>{pos();e.step(1,['pause']);const x=G.p.x,y=G.p.y;e.step(60,['right','up']);assert.equal(G.p.x,x);assert.equal(G.p.y,y);e.step(1,['pause']);assert.equal(G.state,'play');});
+check('all rescues sit at their intended depth',()=>{e.start();for(const o of G.pows){const s=g('LV').pows[o.id];assert.equal(o.y,s.y);assert.ok(g('POW_KINDS')[o.kind]);}assert.ok(new Set(G.pows.map(o=>o.y)).size>=3);});
+check('reward remains collectible at rescue depth',()=>{e.start();const o=G.pows[0];G.p.x=o.x;G.p.y=o.y;g('freePow')(o);e.step(45);const it=G.items[0];assert.ok(it);assert.ok(Math.abs(it.y-o.y)<40);G.p.x=it.x;G.p.y=it.y;e.step(12);assert.ok(!G.items.includes(it));});
+check('intro skip hands over swimming',()=>{g('devStart')({level:4});assert.ok(G.intro);e.step(1,['enter']);e.step(2);assert.ok(!G.intro);assert.equal(G.p.ride.type,'scuba');});
+check('Mission 3 advances to 4 and 4 to all clear',()=>{e.start(3);g('toWin')();G.endT=150;e.step(1,['enter']);assert.equal(G.level,3);assert.equal(G.state,'play');e.step(1);g('toWin')();G.endT=150;e.step(1,['enter']);assert.equal(G.state,'allclear');});
+check('boss attacks reach a swimmer on either side',()=>{for(const side of [-1,1]){pos(6100,150);const boss=g('makeEnemy')({t:'megaoctopus',x:6240});boss.x=6240;boss.state='tell';boss.timer=1;boss.cycle=1;boss.targetY=135;boss.targetX=6240+side*100;G.p.x=boss.targetX;G.eb=[];g('ENEMY_TYPES').megaoctopus.update(boss);assert.equal(Math.sign(G.eb[0].vx),side);}});
+check('four areas and both vehicles render cleanly',()=>{for(const x of [500,2100,3900,5600]){e.start(4,x);e.step(180,[],true);g('draw')();}assert.deepEqual(e.errors,[]);assert.deepEqual(e.warnings,[]);});
+console.log(`${checks} checks passed`);

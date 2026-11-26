@@ -1,0 +1,11 @@
+import { createRequire } from 'module';
+const require = createRequire('/Users/macbookair/game/tools/harness/');
+const { createCanvas, loadImage } = require('@napi-rs/canvas');
+import fs from 'fs';
+const [out, cols, ...files] = process.argv.slice(2);
+const imgs = await Promise.all(files.map(f => loadImage(f)));
+const C = +cols, w = imgs[0].width, h = imgs[0].height, rows = Math.ceil(imgs.length / C);
+const cv = createCanvas(C * w, rows * (h + 16)), g = cv.getContext('2d');
+g.fillStyle = '#111'; g.fillRect(0, 0, cv.width, cv.height); g.fillStyle = '#fff'; g.font = '12px sans-serif';
+imgs.forEach((im, i) => { const x = (i % C) * w, y = Math.floor(i / C) * (h + 16); g.fillText(files[i].replace(/.*\//, ''), x + 4, y + 12); g.drawImage(im, x, y + 16); });
+fs.writeFileSync(out, cv.toBuffer('image/png'));

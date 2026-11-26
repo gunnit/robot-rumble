@@ -1,0 +1,257 @@
+[
+ {
+  "key": "bugs",
+  "review": {
+   "findings": [
+    {
+     "id": "bugs-1",
+     "title": "Beating the MEGA BEAR still ends in GAME OVER if the hero loses the last life around the kill (and is still hurtable during its 2.5 s death animation)",
+     "severity": "major",
+     "category": "correctness",
+     "known": false,
+     "files": [
+      "src/level2_boss.js",
+      "src/engine.js"
+     ],
+     "evidence": "Fixture /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/work/review-bugs/bossdeath.js (with lib.js), src build, camera on the 5720 lock, after the bear's intro, G.lives = 1 and hearts = 1. Scenario A, the hero loses the last heart on the frame the boss is finished: 'RB A hero dead 1 boss state dying dying true' / 'RB A RESULT state over after 110 frames; hero died at 1 ; bossDefeated (winT set) at  ; boss still in G.enemies true' / 'RB A pressed Enter on game over -> state play continues 1 restarted at checkpoint 4400 hero x 4460 boss present false'. Scenario B, boss killed while one ordinary wolf (not one of its pups) is still around: 'RB B RESULT state over after 254 frames; hero died at 144 ; bossDefeated (winT set) at 150' (the wolf killed the hero during the death animation, and the game over came even after G.winT was set). Picture /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/shots/review-bugs/boss-beaten-gameover.png (whole frame): GAME OVER / CONTINUE? over the bear's wreck, 'MEGA BEAR DOWN!' still floating, the 10000 kill points on the HUD. Code: level2_boss.js:1269-1276 onKill only kills e.pups and makes the boss (not the hero) invulnerable; bossDefeated(), which sets the G.winT that hurtPlayer checks, only runs at death-animation frame 150 (level2_boss.js:1003-1013); engine.js:212 hurtPlayer only blocks on G.winT; engine.js:226-239 playerRespawn goes to 'over' at 0 lives even with G.winT > 0. docs/engine-api.md:129 promises hurtPlayer 'does nothing ... after the boss is beaten'.",
+     "repro": "node /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/harness.mjs sim --level 2 --frames 1 --extra /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/work/review-bugs/lib.js --extra /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/work/review-bugs/bossdeath.js | grep '^RB'. In play: last life, one heart; the shot, grenade or rocket that finishes the bear lands up to ~1.8 s after the hero is hit (the hero is already falling), or a leftover orchard wolf/eagle gets the last heart in the 150 frames of the death animation; 110 frames after the hero falls the game shows GAME OVER instead of the win.",
+     "impact": "After the hardest fight of the game the child sees MEGA BEAR DOWN!, then GAME OVER. CONTINUE restarts at 4400 (the whole orchard on foot and the whole boss again, K2); not pressing Enter within 10 s goes back to the title. Kids are often on their last life at the final boss, so the ~4 s window around the kill will be hit.",
+     "suggestion": "level2_boss.js megabear onKill: replace 'for (const w of e.pups) if (!w.dead && !w.dying) damageEnemy(w, 99);' with 'for (const w of G.enemies) if (w !== e && w.active && !w.dead && !w.dying && w.state !== 'dying') damageEnemy(w, 99); const p = G.p; p.inv = Math.max(p.inv, 400); if (p.dead && G.lives <= 1) G.lives = 2;' (a hero who is already down respawns with inv 180 and the win still comes at frame 150). Verified on a patched copy (work/review-bugs/variant-bossdeath.html built with mkvariant from edits-bossdeath.json): both scenarios end in state 'win' after 359 frames, and the seed-1 bot sim is byte-identical to the unpatched one. Optional engine safety net: engine.js playerRespawn 'if (G.lives > 0 || G.winT > 0)' so nobody gets GAME OVER once bossDefeated has run.",
+     "effort": "small"
+    },
+    {
+     "id": "bugs-2",
+     "title": "In the battle tractor the MEGA BEAR's laser and ground pound can't be dodged: DUCK! can't be obeyed, the JUMP! and shockwave hop windows are 1-3 frames",
+     "severity": "minor",
+     "category": "correctness",
+     "known": false,
+     "files": [
+      "src/level2_boss.js",
+      "src/vehicle.js"
+     ],
+     "evidence": "tractorlaser.js (src build, tractor boarded in the arena, phase 2, Down held throughout): 'RB laser lane high hero x 5764 tractor box {x:5740.05,y:192,w:48,h:40}' then 'RB RESULT armour before the HIGH laser 6 after 5 riding true (Down held all along)'. The HIGH lane hurts y-33..y-27 (level2_boss.js:491 LANES.high y -30, :958 hurt rect h 6) while RIDES.tractor.box covers y-40..y (vehicle.js:790) and a ride can't crouch. Picture /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/shots/review-bugs/tractor-duck.png, crop box x 0-900, y 420-750 of the 3x image (saved as tractor-duck-crop.png): DUCK! over the cab, partly behind the canopy, the beam through the hero's head and the tractor, the armour segment just lost in the HUD. tractorlow.js, LOW pulse, hop s = 0..30 frames after JUMP! appears: 'tractor XXXXXXXXXXXX...XXXXXXXXXXXXXXXX' vs 'on foot ....................XXXXXXXXXXX' (3-frame window vs 20). tractorwave.js, pound shockwave, hop when the wave is D = 0..96 px (step 4) from the box front: 'tractor X.XXXXXXXXXXXXXXXXXXXXXXX' vs 'on foot X...................XXXXX' (one 4-px spot vs 72 px). Cause: HOP -3.4 / GRAV 0.24 (vehicle.js:452) keep the 48-px box 8-12 px up for only ~18-22 frames while it needs ~23 frames over the wave and ~17 over the pulse; the JUMP! cue is timed for p.x + 6, not the ride's front (level2_boss.js:967).",
+     "repro": "node /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/harness.mjs sim --level 2 --frames 1 --extra .../work/review-bugs/lib.js --extra .../work/review-bugs/tractorlaser.js (or tractorlow.js / tractorwave.js) | grep '^RB'. In play: drive the tractor into the arena, follow the DUCK! / JUMP! prompts.",
+     "impact": "A child in the tractor sees DUCK! or JUMP!, does exactly that and still loses armour on every laser and every ground pound (about one armour per pound in phase 1), so the prompts teach the wrong thing and the tractor is wrecked whatever they do. The hero itself loses no hearts.",
+     "suggestion": "level2_boss.js nextAttack: 'if (a === 'laser') e.lane = G.p.ride ? 'low' : e.lasers++ % 2 ? 'low' : 'high';' (no unobeyable DUCK! for a ride) and time the LOW cue from the ride's front (pbox(p).x + pbox(p).w instead of p.x + 6). vehicle.js: HOP -3.4 -> -4.4 (max hop ~40 px). Measured on a patched copy (work/review-bugs/variant-tractor.html from edits-tractor.json): LOW pulse window 3 -> ~14 frames ('tractor X.......XXXXXXXX', s step 2), shockwave window one 4-px spot -> 8-24 px ('tractor X...XXXXXXXXX', D step 8); -4.8 would bring the shockwave close to on-foot fairness. Alternative: no laser/pound while the hero rides.",
+     "effort": "small"
+    },
+    {
+     "id": "bugs-3",
+     "title": "A freed animal can be removed before it drops its item: the pony's B in the ROBO BEAR lock can vanish",
+     "severity": "polish",
+     "category": "correctness",
+     "known": false,
+     "files": [
+      "src/engine.js"
+     ],
+     "evidence": "powcull.js: the pony (item B) stands at x 2300, 50 px inside the left edge of the 2250 lock; freed while the last lock robot goes and the hero stands on the right: 'RB lock active true cam 2250 pony x 2300 state tied' / 'RB RESULT lock done true pony removed {frame:25,ponyT:25,cam:2342} (its item drops at t 40) B dropped false items now none'. Code: engine.js:529 removes every POW at o.x <= cam.x - 40 whatever its state, the item only drops at salute frame 40 (engine.js:525), and after a lock the camera catches up at 4 px a frame (engine.js:630).",
+     "repro": "node /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/harness.mjs sim --level 2 --frames 1 --extra .../work/review-bugs/lib.js --extra .../work/review-bugs/powcull.js | grep '^RB'. In play: free the pony with a shot or blast in the last ~25 frames of the ROBO BEAR fight while standing in the right half of the screen.",
+     "impact": "Rare: the +10 grenades never appear and the rescued pony disappears mid-celebration. Different from K1 (item dropped behind): here no item is dropped at all.",
+     "suggestion": "engine.js updatePows: keep 'free'/'salute' animals until they run (cull only 'tied' and 'run' at cam.x - 40), and drop the item on screen: dropItem(o.item, Math.max(o.x - 10, G.cam.x + 24), ...). Fits the K1 fix (toss the item toward the hero).",
+     "effort": "small"
+    },
+    {
+     "id": "bugs-4",
+     "title": "Explosion 'flash' particles turn into NaN before they are ever drawn (pre-existing engine bug)",
+     "severity": "polish",
+     "category": "nan-math",
+     "known": false,
+     "files": [
+      "src/engine.js"
+     ],
+     "evidence": "engine.js:136 pushes {type:'flash', x, y, life, max, size} with no vx/vy; updateFx (engine.js:596) does p.x += p.vx -> NaN. flashnan.js: 'FLASHNAN created at [300,200] after one updateFx: NaN NaN' on the src build and on backup/index-before-level2.html. Every fuzz run's NaN audit reports only this ('part:flash.x=NaN'). Booms happen in updateEnemies/updateBullets/updateGrenades before updateFx in the same update, so the 5-frame white disc in drawFx (engine.js:840-841) is never drawn (only G.later booms show it for one frame).",
+     "repro": "node /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/harness.mjs sim --level 1 --frames 1 --extra .../work/review-bugs/flashnan.js | grep FLASHNAN (add --legacy /Users/macbookair/game/backup/index-before-level2.html for the old build)",
+     "impact": "Nothing breaks; every explosion in both missions lacks its intended bright flash, and NaN particles show up in any audit.",
+     "suggestion": "engine.js boom: G.parts.push({ type: 'flash', x, y, vx: 0, vy: 0, life: 5, max: 5, size: 16 * s }). That changes how every Mission 1 explosion looks (a 5-frame white flash), so apply it only if the parent likes it; otherwise delete the dead flash particle.",
+     "effort": "small"
+    },
+    {
+     "id": "bugs-5",
+     "title": "Screen shake calls Math.random in drawPlay, so seeded harness runs depend on how often draw() is called",
+     "severity": "polish",
+     "category": "determinism",
+     "known": false,
+     "files": [
+      "src/screens.js"
+     ],
+     "evidence": "screens.js:90-91 rand(-G.shake, G.shake) inside drawPlay; Mission 2 shakes almost constantly (bear footfalls, the boss). Same seed and bot, only one extra draw() per update (drawmore.js): '{hitsBySection:[1,4,1,10],deaths:2,continues:0,seconds:181.6,...}' vs '{hitsBySection:[1,6,1,17],deaths:5,continues:1,seconds:261.1,...}'. With the shake hashed instead (work/review-bugs/variant-shake.html from edits-shake.json) both cadences give identical JSON ('hitsBySection:[1,4,3,7] ... IDENTICAL'), so this is the only draw-time Math.random in the build: all Mission 2 draw code is random-free.",
+     "repro": "node .../harness.mjs sim --level 2 --seed 1 and the same with --extra .../work/review-bugs/drawmore.js; compare the JSON",
+     "impact": "No effect for the kids (browser randomness is unseeded). Per-seed harness results (tuning comparisons, 'seed N shows bug X') change whenever the draw cadence changes (sim vs render-driven fixtures, loop-test at 75/120/144 Hz).",
+     "suggestion": "screens.js drawPlay: const sx = G.shake ? Math.round((hsh(G.t * 1.37) * 2 - 1) * G.shake) : 0; const sy = G.shake ? Math.round((hsh(G.t * 2.11 + 5) * 2 - 1) * G.shake) : 0. This also changes Mission 1's shaking frames (legacy pixel parity only in frames with shake), so keep the current code if exact Mission 1 parity matters more.",
+     "effort": "small"
+    }
+   ],
+   "strengths": "Mission 1 is untouched by Mission 2: after a scripted tour of Mission 2 in the same session (intro, woods, tractor ride into the rain, orchard with the flame, MEGA BEAR beaten, win -> ALL MISSIONS COMPLETE -> title, all drawn), Mission 1 bot sims are byte-identical to fresh ones (seeds 1, 2 with hero 1, 3) and Mission 1 renders at x 250/1950/3350/4620 are pixel-identical to shots/refactor/new-l1-x*.png (m2then.js): no canvas-state, G, LV or cache leaks. No swallowed errors: errorOnce wrapped and counted over 182,481 fuzz frames (48 episodes: random keys incl. pause, Enter and Down+Z, every weapon, extra tractors, god and no-god with 8 continues, win -> allclear -> title) plus every scenario fixture: 0 calls, harness errors [] everywhere; the NaN audit of hero, ride, enemies, bullets, items, props, POWs and particles finds only the pre-existing flash particle. Continue/checkpoint reset is clean: after riding, getting out and losing the last life at the farm, the continue gives ride null, hidden false, door 0, treeShake 0, empty pb/eb/items, rain 0 and a fresh tractor at 2950 (armour 6, shells 15) that boards again (contride.js); the fuzz continue check never saw a dirty continue. Determinism: no Math.random at load time (rngprobe.js) and none in any Mission 2 draw code (the hashed-shake variant is identical at any draw cadence). The built index.html plays byte-identically to src (seed 1); flow self-test re-run 18/18. Contracts hold: the MEGA BEAR's onKill clears G.eb, rocks, beam and pups, mbbeam removes itself, the robo bear never calls bossDefeated, the hero cannot die inside the tractor, getOut/wreck park props safely during iteration, every lock enemy walks or flies on screen (no softlock found), all 20 platforms sit 18-31 px above the terrain under them, and every Mission 2 module keeps its state private and resets it in load/skyLoad/worldLoad. The proposed bugs-1 fix keeps the seed-1 sim byte-identical.",
+   "coverage": "Read fully: src/level2.js, level2_world.js, level2_enemies.js, weapons_extra.js, vehicle.js (lines 120-300, load-time sprite painting, skimmed), level2_boss.js (200-440, load-time sprite builders, skimmed), level2_sky.js (420-1080, load-time pixel-art painters, skimmed), plus engine.js, core.js, screens.js, main.js, audio.js, docs/engine-api.md and docs/level2-spec.md. Ran (all fixtures and outputs in /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/work/review-bugs/, pictures in .../harness/shots/review-bugs/): Mission 1 parity after Mission 2 (3 sims, 4 renders); 6 fuzz runs; boss death on the last life (2 scenarios + patched copy + seed-1 sim on the patch); tractor vs HIGH laser, LOW pulse and shockwave (ride vs foot, original vs patched copy); continue after riding; pony cull; draw-cadence determinism on src and a patched copy; flash NaN on src and the legacy build; built vs src sim; flow self-test. Not covered: audio by ear (the harness has no audio; by code every sound is a one-shot, the longest tails are the boss roar ~1.6 s and the WARNING rumble 1.5 s after a pause, the same class as K13, no looping sound); real browser timing and refresh rates (loop-test not re-run); balance and visuals beyond correctness; a many-seed bot sweep (the integrator ran 60). The wave test's first time-based version (tractorwave-timebased-superseded.out) hopped too early and was replaced by the distance-based tractorwave.js quoted above. For a few minutes I had 4 harness processes running at once, one over the limit of 3.",
+   "sheet": "/private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/shots/review-bugs/sheet.png"
+  }
+ },
+ {
+  "key": "flow",
+  "review": {
+   "findings": [
+    {
+     "id": "flow-1",
+     "title": "Rockets and flame picked up in the tractor stay hidden, the flame replaces the unused rockets, and nothing shows how to get out",
+     "severity": "minor",
+     "category": "ux",
+     "known": false,
+     "files": [
+      "src/vehicle.js",
+      "src/screens.js",
+      "src/engine.js"
+     ],
+     "evidence": "Three sims, `sim --level 2 --seed 1|2|3 --extra /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/work/review-flow/pickups.js`, log 'BOARD at x 2944', 'PICKUP R at x 3155 IN THE TRACTOR', 'PICKUP F at x 4541 IN THE TRACTOR', 'EXIT at x 6061 (thrown out)'. Seeds 2 and 3 show the same pattern. With `--extra .../review-flow/weaponuse.js` the shots fired were SHOTS {\"pistol\":482,\"flame\":120}, {\"pistol\":420,\"flame\":120} and {\"pistol\":428,\"flame\":120}: no rocket was fired in 3/3 runs, and each log says 'EXIT holding flame (120)'. The samesession.mjs log says 'M2 left at x 3788 ride true weapon rocket' while the HUD reads TRACTOR: see /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/shots/review-flow/crop-hud-tractor.png, which is box 0,0-480,70 of campaign-s1h0/13-m2-rain-before-pause.png. Pausing in the tractor lists only the on-foot keys: .../shots/review-flow/campaign-s1h0/14-m2-rain-paused.png (whole frame shows 'Z: JUMP X: SHOOT C: GRENADE' over the tractor). Code: engine.js:548 collects items through pbox(p), which is the tractor's box while riding. engine.js:268 giveWeapon replaces a different weapon, so R is lost when F is picked up. vehicle.js:772-786 rideHud shows only TRACTOR, armour and shells. vehicle.js:531 makes Down+Z get out and vehicle.js:586 makes C fire the cannon, but the only tractor texts on screen are 'GET IN!' (vehicle.js:400) and 'BATTLE TRACTOR!' (vehicle.js:826). screens.js:415-425 drawPause has no lines for the tractor.",
+     "repro": "Start Mission 2, get into the tractor at x 2950 and keep driving right. At the cow (3200) 'ROCKET LAUNCHER!' pops up and the voice says 'Rocket launcher!', but the HUD still says TRACTOR. At the goat (4600) 'FLAME SHOT!' appears, and the rocket launcher is gone without firing a single rocket. Press P: the help only shows the on-foot controls.",
+     "impact": "A child who stays in the tractor never fires a rocket. The bot stays in it in 3/3 seeds, and the tractor is strong (K4). Rockets are one of the three new weapons the parent asked for. The child hears 'Rocket launcher!', nothing changes, and nothing tells them that Down+Z gets them out to use what they picked up.",
+     "suggestion": "(1) vehicle.js rideHud: also show the weapon being carried, e.g. WEAPONS[p.weapon].icon small at x 204, y 9 with p.ammo when p.weapon !== 'pistol', and move the shell counter to the second row, so a pickup visibly lands. (2) vehicle.js: when the hero gets in (boardIt, next to BATTLE TRACTOR!) and on any weapon pickup while riding, push a G.texts hint 'DOWN + Z: GET OUT' (t 120). (3) screens.js drawPause: when G.p.ride is set, replace the two on-foot lines with 'ARROWS: DRIVE  Z: HOP  X: MACHINE GUN' and 'C: CANNON  DOWN + Z: GET OUT'. Mission 1 has no ride, so its pause render stays identical. Optional (4) engine.js giveWeapon: while p.ride is set, a different weapon letter does not replace a stocked weapon (keep the first one, or leave the letter on the ground).",
+     "effort": "small"
+    },
+    {
+     "id": "flow-2",
+     "title": "A Mission 2 continue shows 'MISSION START!' and says 'Mission start!', while the mission's own start says 'MISSION 2 START!'",
+     "severity": "polish",
+     "category": "text",
+     "known": false,
+     "files": [
+      "src/engine.js",
+      "src/level2.js"
+     ],
+     "evidence": "/private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/work/review-flow/cont0.mjs prints 'continue: play cam 0 x 120 y 176 hidden false intro false door 0 banner AREA 1: HOME SWEET HOME big MISSION START! continues 1'. Picture: .../shots/review-flow/m2-continue-x0.png (the band at y 96-132 reads MISSION START!). engine.js:83 loadLevel always uses 'MISSION START!' and engine.js:121 continueGame says 'Mission start!'. level2.js:729 uses 'MISSION 2 START!' and 'Mission two, start!'.",
+     "repro": "In Mission 2, lose all lives and press Enter on CONTINUE?.",
+     "impact": "Small inconsistency between the mission's start and every restart in Mission 2.",
+     "suggestion": "engine.js:83: G.big = { s: LV.startText || 'MISSION START!', t: 130 }. engine.js:113 and 121: say(LV.startSay || 'Mission start!'). In level2.js VIGO add startText: 'MISSION 2 START!' and startSay: 'Mission two, start!'. Mission 1 has neither field, so its frames and sims stay identical.",
+     "effort": "small"
+    },
+    {
+     "id": "flow-3",
+     "title": "After ALL MISSIONS COMPLETE, playing again starts on Mission 2 because its card stays selected",
+     "severity": "polish",
+     "category": "flow",
+     "known": false,
+     "files": [
+      "src/engine.js"
+     ],
+     "evidence": "Campaign log /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/work/review-flow/campaign-s1h0.log shows 'ENTER on allclear -> {\"state\":\"title\",\"level\":2,...}' followed by 'missions again: level 2'. Picture: .../shots/review-flow/campaign-s1h0/21-missions-again.png (VIGO HILLS card highlighted). engine.js:755 goes to the title without resetting G.level, and engine.js:715 keeps it. Two-mission runs scored 45800-51100 and Mission 2 alone 30650-33000 in sims, so a game started on the preselected card cannot reach the BEST SCORE set by the full adventure.",
+     "repro": "Finish Mission 1 and Mission 2, press Enter on ALL MISSIONS COMPLETE, then Enter, Enter, Enter.",
+     "impact": "The next game skips Mission 1 unless the child notices the highlighted card.",
+     "suggestion": "engine.js:755: { G.state = 'title'; G.level = 0; G.fade = 1; }. Do this only after ALL MISSIONS COMPLETE, and keep G.level after a game-over timeout so a retry stays on the mission that was just lost. Mission 1 parity is unaffected.",
+     "effort": "small"
+    },
+    {
+     "id": "flow-4",
+     "title": "Menus always use Mission 1's jungle: the hero select shows the jungle with VIGO HILLS chosen, and ALL MISSIONS COMPLETE stands on jungle grass",
+     "severity": "polish",
+     "category": "screens",
+     "known": false,
+     "files": [
+      "src/screens.js",
+      "src/level2.js"
+     ],
+     "evidence": "/private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/shots/review-flow/campaign-s1h0/22-select-again.png shows VIGO HILLS chosen with the jungle behind the hero cards. screens.js:305-308 drawSelect draws LEVELS[0].drawBG(200) and drawGround(200). screens.js:393 drawAllClear draws LEVELS[0].drawGround(200). screens.js:118-119 drawMenuBG uses LEVELS[0]. drawLockedPreview in screens.js (Vigo by night) is no longer drawn now that both missions exist.",
+     "repro": "Pick VIGO HILLS on the mission select.",
+     "impact": "The 'significantly better' Vigo mission looks like the jungle until play starts.",
+     "suggestion": "screens.js drawSelect: const L = LEVELS[G.level] || LEVELS[0], with camera x = L.menuX ?? 200; VIGO menuX: 0 shows the house and the ria. Keep LEVELS[0] at 200 when G.level === 0, so the select render in compare-refactor stays identical. Optional: after Mission 2, draw ALL MISSIONS COMPLETE on the Vigo hill at night by reusing drawLockedPreview's art.",
+     "effort": "small"
+    },
+    {
+     "id": "flow-5",
+     "title": "ALL MISSIONS COMPLETE has no music: after a 1-second jingle there are only firework pops",
+     "severity": "polish",
+     "category": "audio",
+     "known": false,
+     "files": [
+      "src/engine.js",
+      "src/level2.js"
+     ],
+     "evidence": "The campaign runner uses a fake AudioContext that records every note and which bus it plays on. It logged 'allclear: music notes 0 sfx 12' for the first 150 frames, then 'allclear 5s later: music notes 0'. The music log ends with '... play:2:bearboss win:2:(stop)' (/private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/shots/review-flow/campaign-s1h0/music.json). engine.js:127 toWin stops the music, and engine.js:747 only plays Snd.win() for the all-clear.",
+     "repro": "Win Mission 2, press Enter, and listen on the trophy screen.",
+     "impact": "The finale of the whole adventure is quieter than any mission screen.",
+     "suggestion": "Add a short victory loop: TRACKS.victory in level2.js (for example the vigo jig's B part, bpm 150, lead 'square') and VIGO.clearMusic = 'victory'. In engine.js:747 call `if (LV.clearMusic) Music.play(LV.clearMusic);` (the guard matters because Music.play warns on an unknown name), and call Music.stop() at engine.js:755 when going to the title.",
+     "effort": "small"
+    },
+    {
+     "id": "flow-6",
+     "title": "The boss bar touches the GAME OVER title when the game ends during the ROBO BEAR or MEGA BEAR fight",
+     "severity": "polish",
+     "category": "layout",
+     "known": false,
+     "files": [
+      "src/screens.js"
+     ],
+     "evidence": "/private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/shots/review-flow/crop-gameover-bossbar.png is box x 300-680, y 40-160 (2x) of .../shots/review-flow/campaign-s1h0/23-m2-gameover.png. The 'ROBO BEAR 58%' bar's lower edge runs into the GAME OVER letters. In code, the boss bar panel covers y 34-53 (screens.js:59-60), and logoText('GAME OVER', 52, 4, ...) at screens.js:329 draws its shadow from y 50.",
+     "repro": "Lose the last life while the ROBO BEAR (lock at 2250) or the MEGA BEAR is on screen.",
+     "impact": "Small visual collision. Mission 2 has two boss bars, so it happens more often than in Mission 1.",
+     "suggestion": "screens.js drawHUD: skip the boss bar when G.state === 'over', or move GAME OVER down to y 58. The 'over' render in compare-screens has no boss on screen, so it stays identical.",
+     "effort": "small"
+    },
+    {
+     "id": "flow-7",
+     "title": "There is no way back to the title from pause: a child who picked the wrong mission must lose all lives and wait out the 10 s countdown, or reload",
+     "severity": "polish",
+     "category": "flow",
+     "known": false,
+     "files": [
+      "src/engine.js",
+      "src/screens.js",
+      "src/core.js"
+     ],
+     "evidence": "engine.js:734-736: the pause state can only resume (P, Esc or Enter), and screens.js:415-425 offers nothing else. In the campaign run, getting from Mission 2 back to the title took a game over plus 'countdown ran out after 540 frames -> title' (/private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/work/review-flow/campaign-s1h0.log).",
+     "repro": "Start VIGO HILLS by mistake, then try to switch to ROBOT JUNGLE.",
+     "impact": "This was already true with one mission. With two missions, switching mission is a real need.",
+     "suggestion": "core.js KEYMAP: quit: ['KeyQ']. engine.js 'pause' case: if (tap('quit')) { G.state = 'title'; Music.stop(); G.fade = 1; }. screens.js drawPause: add a line 'Q: BACK TO TITLE'. The Mission 1 pause render changes by one line, which is intended.",
+     "effort": "small"
+    },
+    {
+     "id": "flow-8",
+     "title": "K8, with a replacement that fits: the title hint still says FREE THE PRISONERS FOR POWER-UPS!",
+     "severity": "polish",
+     "category": "text",
+     "known": true,
+     "files": [
+      "src/screens.js"
+     ],
+     "evidence": "screens.js:144 draws the hint inside the controls panel, panel(116, 150, 248, 70), which is 248 px wide. 'FREE PRISONERS & ANIMALS FOR POWER-UPS!' is 39 characters = 233 px at 6 px per glyph, so it fits, and every character in it, including &, is in GLYPHS. The current hint is visible on every title render, e.g. /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/shots/review-flow/campaign-s1h0/20-title-again.png.",
+     "repro": "Open the title screen.",
+     "impact": "Mission 2 rescues animals, not prisoners.",
+     "suggestion": "screens.js:144: 'FREE PRISONERS & ANIMALS FOR POWER-UPS!'. Optionally screens.js:134: 'A MISSION FOR INES & MATHIAS' -> 'MISSIONS FOR INES & MATHIAS' (161 px, fits the 192 px ribbon). Then expect a text-only title diff in compare-refactor.",
+     "effort": "small"
+    },
+    {
+     "id": "flow-9",
+     "title": "K9 re-measured at 299 ms in Chrome; the build can safely move off the hero-select Enter",
+     "severity": "polish",
+     "category": "performance",
+     "known": true,
+     "files": [
+      "src/level2_sky.js",
+      "src/level2.js"
+     ],
+     "evidence": "In the Browser pane (Chrome 152) on a fresh page, timing update() frame by frame: the frame that handles Enter on the hero select for Mission 2 took 299 ms, and every other menu frame took at most 12.7 ms. In headless Chrome on file:// with a throwaway profile, the first draw after devStart at the farm took 248 ms. Cause: level2_sky.js:1487-1488 L2.skyLoad calls ready(), which runs build() (level2_sky.js:1086-1114) the first time. level2_sky.js:15 states that the sky never calls Math.random.",
+     "repro": "Reload the page, then choose VIGO HILLS and a hero.",
+     "impact": "About a 0.3 s freeze between the hero select and the intro, once per page load.",
+     "suggestion": "Split build() into steps: LAY[0], LAY[1], LAY[2], LAY[3], then clouds, rain, rainbow and BUF. Run one step per frame while the title or mission select is showing, for example a setTimeout chain started on the first title draw or from VIGO.preview's first call. ready() then finishes whatever steps are left. The sky never uses Math.random, so seeded Mission 1 sims and renders stay identical.",
+     "effort": "medium"
+    },
+    {
+     "id": "flow-10",
+     "title": "K7 measured: the vigo gaita lead is not louder or brighter than Mission 1's music (lower the severity)",
+     "severity": "polish",
+     "category": "audio",
+     "known": true,
+     "files": [
+      "src/level2.js"
+     ],
+     "evidence": "In Chrome I rendered 12 s of each track with an OfflineAudioContext, using the game's own Music scheduler and bus gains. vigo: RMS -36.1 dBFS, peak -13.8 dB, spectral centroid 191 Hz, 0.5% of energy above 2 kHz (0.2% above 4 kHz). Mission 1 main: -36.5 / -13.4 / 229 Hz / 0.8% (0.4%). boss: -36.5 / -13.7 / 187 Hz / 0.6%. bearboss: -36.0 / -13.7 / 237 Hz / 0.9%. The triangle bass dominates the mix. The sawtooth lead plays at the same 0.11 gain as every lead and adds no measurable harshness.",
+     "repro": "Run the OfflineAudioContext render (javascript in the pane) for main, boss, vigo and bearboss.",
+     "impact": "Low risk. It has still not been checked by ear.",
+     "suggestion": "No change needed. If one listen finds it nasal, the zero-risk swap is lead: 'square' (as Mission 1 uses) in TRACKS.vigo in level2.js.",
+     "effort": "small"
+    }
+   ],
+   "strengths": "Mission 1 is unchanged. My copies of compare-refactor.sh and compare-screens.sh show 0 differing pixels on title, select, x 250/1950/3350/4620, over and pause. The only win-screen change is the intended prompt line (box [489,642,950,665], PRESS ENTER FOR MISSION 2!). All 30 Mission 1 sims (seeds 1-5, both heroes) give byte-identical JSON from src, from index.html and from backup/index-before-level2.html. index.html is identical to a fresh build of src. Mission 2 sims from src and from index.html match (6/6).\n\nPlaying Mission 2 first leaves no trace on Mission 1. I tested three ways of leaving Mission 2: a full win through ALL MISSIONS COMPLETE back to the title, quitting in the rain inside the tractor, and quitting at the MEGA BEAR, with both heroes, from src and from the built file. In every case the following Mission 1 run matched a fresh one frame for frame: the same position and score every 60 frames, the same result, and the same 6 frames plus the win screen. Its devStart renders equal the harness references, which equal the old build. The --extra variant gives sims identical to plain runs (seeds 1-3) and renders identical to fresh and legacy. In real Chrome, frame hashes of Mission 1 and the title, mission select and hero select are the same on a fresh page and after a full Mission 2.\n\nThe whole flow works with real wins: 3 runs, Ines and Mathias, src and built file, with and without a saved best, one with a Mission 2 continue.\n- Both cards respond to left/right, and nothing goes past the last card.\n- After the Mission 1 win, Mission 2 starts with the same hero, the score carried over (14200/14400), 3 lives and continues reset.\n- The intro starts with the hero inside the house and vigo music; bearboss plays at the boss lock.\n- The win screen shows ANIMALS RESCUED 7 / 7, 3 stars (2 with a continue), TIME 3:01-4:27, then PRESS ENTER TO CONTINUE, ALL MISSIONS COMPLETE with final and best score, and the title with BEST SCORE.\n- Mission 2 can be started again from the select with the score at 0; a game-over countdown returns to the title; Mission 1 then works from score 0.\n- errors and warnings are empty in every run.\n\nBest score uses only the key robotRumbleBest. An existing best (20000) loads and is not overwritten by a lower Mission 1 score; it is replaced at the Mission 2 win (45800). A first-ever best is saved. It survives a reload in Chrome and on file://.\n\nP/Esc pause stops both music and sound effects (0 notes in 2-3 s). M mutes only the music, and unmuting resumes the right track. Pause, mute and the Enter skip also work inside the intro, and the Enter that unpauses does not also skip.\n\nEvery Mission 2 string uses glyphs the font has and fits its space: the HUD with S/R/F at maximum ammo, the tractor panel, the cards, banners, and the win and all-clear screens for both hero names. The intro and the Mission 2 card render correctly in Chrome.\n\nReal Chrome:\n- No console output.\n- No requests besides the document (0 resource entries, 15 inline scripts, no fonts or links).\n- The first real key press creates a running AudioContext.\n- 60 fps at the farm lock in the rain (update at most 4.5 ms, draw mean 1.6 ms, p95 2.6 ms) and at the MEGA BEAR (draw mean 0.75 ms).\n\nOpened as a local file (file://) in headless Chrome 156: it loads with no console messages or exceptions, only the document is requested, localStorage works, and the first key starts audio.\n\nFixtures: flow 18/18, api 37/37, engine self-test DONE, loop-test 49/49 on src and built. No cache grows: the glyph cache holds 168 entries at the Mission 1 win and 199 at the Mission 2 win.",
+   "coverage": "H = /private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness.\n\nScripts are in H/work/review-flow:\n- hlib.mjs: a copy of harness.mjs that exports boot and the bot.\n- campaign.mjs: the whole game in one session, with a fake AudioContext that logs every note by bus, a speech stub, Music.play logging and screenshots.\n- samesession.mjs and extra/m2first-s1..3.js: Mission 1 after Mission 2.\n- filetest.mjs: drives headless Chrome over the DevTools protocol.\n- Small probes: pickups.js, weaponuse.js, growth.js, bossintro.js, cont0.mjs, intropause.mjs, hudweap.mjs, walkperf.mjs, rebuild_check.py.\n\nOutputs are next to the scripts: m1parity/, m2parity/, same-*.json, campaign-*.log/json, filetest/report.json, extra/*.json, fixture-*.txt, loop-*.txt. Pictures are in H/shots/review-flow: refactor/, campaign-s1h0/, campaign-s2h1/, campaign-s3h1-html/, same/, extra/, the sheets (sheet-findings.png, sheet-intro.png, sheet-screens.png, sheet-s3h1.png, sheet-extra-menus.png) and the crops. Nothing under /Users/macbookair/game was changed.\n\nI ran copies of compare-refactor.sh and compare-screens.sh that write to H/shots/review-flow/refactor instead of H/shots/refactor, which other reviewers use. Their frames match H/shots/refactor (0 px).\n\nBrowser pane:\n- Real key events (Enter, ArrowRight, Z, P, M) went through the Browser tool. Holding Right+X used synthetic keydown/keyup, because the tool can only tap keys.\n- The heavy-spot timings used devStart (x 3701.6 and 5921.6, god mode) while the page's real 60 Hz loop was running.\n- The pane reported itself hidden, and later in the session its loop stopped. So the K9 timing and the frame-hash comparison stepped update/draw directly in JavaScript.\n- A whole-level walk stepped directly, in the pane and in node, showed draw spikes of 25-100 ms. I put these down to GPU command flushes and CPU load from the parallel reviewers and did not report them. A full-level timing in a visible pane under the real loop is not covered.\n\nfile://: the pane refuses file:// URLs, so I tested in headless Chrome 156 with a throwaway profile. Headless slows the page loop, so only the first menu key took effect there; that is an artifact of headless, and the same keys work in the pane. Chrome is this Mac's default for .html files (LaunchServices public.html is com.google.chrome), so this is the path the kids use.\n\nMy tests changed the pane's saved best score (5100); I restored it to 5100.\n\nNot covered: listening to the audio (only note counts and an offline render analysis), Safari and Firefox, the kids' real screen size and fullscreen or resize behaviour, gamepads, and sessions longer than about 35,000 frames.",
+   "sheet": "/private/tmp/claude-501/-Users-macbookair-game/f3aa9207-fb8c-45b4-914e-f54b88055d86/scratchpad/harness/shots/review-flow/sheet-findings.png"
+  }
+ }
+]

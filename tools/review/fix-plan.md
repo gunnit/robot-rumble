@@ -1,0 +1,522 @@
+# Mission 2 fix plan (VIGO HILLS)
+
+Planner: fix planner, 2026-11-11. Source of truth: `fix-plan.json` (same content). Running notes: `notes-fix-planner.md`.
+
+46 confirmed verdicts (30 experience, 16 code; ids include their aliases and the fuzz findings fuzz-1/2/3). Five groups work in parallel on disjoint files; an integrator then checks everything together on the real tree.
+
+## Legend
+
+T=/Users/macbookair/game/tools/harness; RD=/Users/macbookair/game/tools/review; FX=RD/fix (tools FX/tools, edit lists FX/edits, baselines FX/baseline); R=FX/<group>/game, the group's RR_GAME root (its own files are the live src, every other file the pristine snapshot FX/src-base); VE=RD/verify-experience-work (labs VE/fx, sound tools VE/snd: sndlog.js, an.mjs, wl.mjs); VC=RD/verify-code-work (fixtures); FW=RD/fuzz-work (fx-*.js, cfg/). 'start-<group>.json #n' = entry n (0-based) of FX/edits/start-<group>.json, a copy of validated exact-string edits; apply with python3 FX/tools/apply.py FX/edits/start-<group>.json <entries> --files <your files>.
+
+## Verdict coverage
+
+| id | where |
+|---|---|
+| art-1 | boss |
+| kids-4 | level |
+| K1 | level |
+| kids-3 | level, gear |
+| kids-9 | level, gear |
+| kids-2 | boss |
+| kids-8 | level |
+| K2 | level |
+| kids-1 | boss |
+| kids-5 | wild |
+| kids-6 | wild |
+| audio-2 | level |
+| audio-1 | gear |
+| audio-5 | gear |
+| audio-3 | boss, wild |
+| audio-4 | boss, wild, gear |
+| art-11 | gear |
+| K14 | gear |
+| kids-7 | engine, gear |
+| audio-6 | gear |
+| audio-7 | level |
+| K7 | level |
+| art-2 | boss |
+| art-3 | wild |
+| art-4 | wild |
+| art-12 | wild |
+| K3 | wild |
+| art-6 | gear |
+| art-8 | gear |
+| art-10 | gear |
+| art-7 | level |
+| audio-8 | wild |
+| audio-9 | level |
+| kids-11 | level |
+| K8 | engine |
+| art-9 | skipped |
+| bugs-1 | boss |
+| F1 | engine |
+| flow-1 | engine, level, gear |
+| bugs-2 | boss |
+| flow-2 | engine, level |
+| flow-3 | engine |
+| flow-6 | engine |
+| flow-5 | engine, level |
+| flow-7 | engine |
+| flow-4 | engine, level |
+| bugs-3 | level |
+| bugs-4 | skipped |
+| bugs-5 | skipped |
+| flow-9 | skipped |
+| K9 | skipped |
+| flow-8 | engine |
+| flow-10 | level |
+| fuzz-1 | engine |
+| fuzz-2 | boss |
+| fuzz-3 | skipped |
+
+## Group: engine
+
+Files: `src/engine.js`, `src/screens.js`, `src/core.js`, `docs/engine-api.md`
+
+**Notes.** Root R=/Users/macbookair/game/tools/review/fix/engine/game. Start: python3 FX/tools/apply.py FX/edits/start-engine.json all --files engine.js,screens.js,core.js (13 validated edits; all five start lists together, 31 edits, pass regress.sh: Mission 1 10/10 identical, sound identical). Mission 1 may change only by policy (a) F1 and (c) the title hint, the pause quit line and the boss bar on GAME OVER: compare-m1.sh must show only title [426,564,1013,587] and pause [453,450,992,473]. New screens.js code stays inside its private block (loop-test checks private names). Also document in docs/engine-api.md the boss pattern this round adds in level2_boss.js and level1.js: an onKill that returns 'dying' may set G.winT (360) at the kill so nothing hurts the hero during the death animation (bossDefeated at st 150 sets 210: same win time). Not done: audio-6's same-frame hit-sound guard in damageEnemy (would change Mission 1 sounds), bugs-4, bugs-5. Edit only your own files, in place in /Users/macbookair/game/src (and your doc in /Users/macbookair/game/docs). Test on your root: RR_GAME=R node T/harness.mjs ... (other groups' files are pristine there). Never touch audio.js, heroes.js, weapons.js, main.js, manifest.json, nor the Mission 3 files (level3*.js, jetski.js, docs/level3-spec.md, tools/m3, proposals). At most 2 harness processes at a time (5 fixers share 8 CPUs; regress.sh defaults to 2). Scratch only in FX/<group>/work and FX/<group>/shots, running notes in FX/<group>/work/notes.md (append as you go, a restart wipes /private/tmp). Policy: no Math.random or rand() at load time or in draw code; match the file's idiom and sparse comments; pixel font glyphs only (A-Z 0-9 space ! ? . , : - ' / + > < & % ( )). Before handing over: python3 FX/tools/policycheck.py --group <group>, FX/tools/regress.sh FX/<group>/work/reg R (Mission 1 sims 10/10 identical to legacy, the Mission 1 sound log identical, Mission 2 10 sims win with errors [], flow 18/18, api 37/37, engine self-test DONE, loop-test ALL OK) and, if you touched anything Mission 1 can show, FX/tools/compare-m1.sh FX/<group>/shots/m1 R. To check a contract with another group's half, build a page from your root plus their start list: RR_SRC=R/src python3 FX/tools/mkvariant.py FX/<group>/work/both.html FX/edits/start-<other>.json, then run the harness with --html.
+
+### engine-1: F1, fuzz-1
+
+- **What:** engine.js updateEnemies, contact 'block' branch, inside `if (overlap(pb, tb) && p.y > tb.y + 8) { ... }`: after the two push lines (the ride push and `else p.x += ...`) add `p.x = clamp(p.x, G.cam.x + 8, G.cam.x + W - 8); // a push never leaves the hero off screen` (the limits updateCamera uses). A robot bear walking into a locked screen can no longer push the hero past the right edge (invisible, shots culled, up to 0.55 s). Policy exception (a): it also fixes Mission 1's tank at the 3720 lock; no other Mission 1 frame changes. docs/engine-api.md, ENEMY_TYPES contact 'block': the push keeps the hero on screen.
+- **Contract:** Engine only. Wild's kids-6 changes only the bear's 'charge' box (a 'hurt' contact); the walk/enter boxes the push uses are unchanged. No shared field.
+- **Tests:** 1) RR_GAME=R node T/harness.mjs sim --level 2 --x 3701.6 --seed 1 --god --frames 20000 --extra VC/cfg-bear.js --extra VC/edgepush.js 2>&1 | grep EDGE -> 'fully off screen in 0 of 76' (pre-fix 13 of 76). 2) The same with --level 1 --x 3921.6 and VC/cfg-tank.js -> 0 of 76 (pre-fix 17 of 76). 3) RR_GAME=R node T/harness.mjs sim --level 2 --x 3701.6 --seed 1 --god --frames 60 --extra FW/fx-sandwich.js 2>&1 | grep SANDWICH -> visible=true on every frame. 4) regress.sh: Mission 1 10/10 identical to legacy, Mission 2 '=base' (the bot never triggers the push). 5) compare-m1.sh: 'tank' and the x renders identical.
+- **Start from:** FX/edits/start-engine.json #0 (= combined.json #11, f1-engine.json; validated: Mission 1 and 2 sims identical, edgepush 0/76 bear and tank)
+
+### engine-2: flow-2
+
+- **What:** Engine half: engine.js loadLevel `G.big = { s: LV.startText || 'MISSION START!', t: 130 };`, beginMission `else say(LV.startSay || 'Mission start!');`, continueGame `say(LV.startSay || 'Mission start!');`, so a Mission 2 continue shows MISSION 2 START! and says 'Mission two, start!'. docs/engine-api.md Levels table: rows startText and startSay (shown and said on a start without an intro, on a continue and on a devStart build).
+- **Contract:** LV.startText (band text) and LV.startSay (spoken line): optional level fields, set by level2.js on VIGO (level task flow-2), read here only. Absent = the old literals, so Mission 1 and the engine self-test are unchanged and each half works alone.
+- **Tests:** 1) RR_GAME=R node T/harness.mjs sim --level 2 --x 1200 --seed 1 --frames 200 --extra VC/contrender.js 2>&1 | grep CONT: on your root (VIGO has no fields yet) 'big MISSION START!' and 'Mission start!'; on a page with the level half (RR_SRC=R/src python3 FX/tools/mkvariant.py FX/engine/work/both.html FX/edits/start-level.json, then --html) 'big MISSION 2 START!' and 'Mission two, start!'. 2) --level 1: the old texts. 3) regress.sh.
+- **Start from:** start-engine.json #1, #2, #3 (= combined #12-#14, flowfix.json; validated with Mission 1 and 2 parity)
+
+### engine-3: flow-3
+
+- **What:** engine.js 'allclear' case: Enter back to the title also sets `G.level = 0`, so Enter through the menus after ALL MISSIONS COMPLETE starts Mission 1 instead of VIGO HILLS again. The game-over countdown keeps G.level (a retry stays on the mission just lost). docs: the Mission flow paragraph.
+- **Contract:** Engine only.
+- **Tests:** RR_GAME=R node T/harness.mjs render --level 2 --x 5921.6 --god --frames 340 --extra FX/tools/menuflow2.js --out FX/engine/shots/mf.png 2>&1 | grep '^MF' -> 'state title level 0', then 'state play level 0 music main LV ROBOT JUNGLE'.
+- **Start from:** start-engine.json #4 (= combined #15, flowfix.json)
+
+### engine-4: flow-5
+
+- **What:** Engine half: engine.js 'allclear' case after fireworks(12): `if (G.endT === 72) { const m = LV.clearMusic || 'victory'; if (TRACKS[m]) Music.play(m); } // after the jingle` (endT 72 = just after Snd.win), and `Music.stop();` when Enter goes back to the title. docs/engine-api.md: a clearMusic row and one line in Mission flow (the ALL MISSIONS COMPLETE screen plays LV.clearMusic, else TRACKS.victory when it exists).
+- **Contract:** level2.js defines TRACKS.victory and sets VIGO.clearMusic = 'victory' (level task flow-5). The engine plays LV.clearMusic, else 'victory', only if TRACKS has it (no warnOnce), so the engine half alone stays silent as today. Mission 3, built in parallel by another session, will become the last mission and gets the same track through the 'victory' fallback.
+- **Tests:** menuflow2.js as in flow-3, with --extra FX/tools/cfg/victory-stub.js before it: the 'MF allclear +140' line lists 'play:victory@212' and the title line says 'music none'; without the stub: no play call and warnings []. flow-selftest 18/18.
+- **Start from:** start-engine.json #12 (planner edit, validated on FX/plan-work/shared.html; it needs #4 first)
+
+### engine-5: flow-6
+
+- **What:** screens.js drawHUD: `if (boss && !offStage(boss) && G.state !== 'over') {` so the boss bar no longer sits on the GAME OVER title (Mission 1's crab too: policy exception c).
+- **Contract:** Engine only.
+- **Tests:** RR_GAME=R node T/harness.mjs render --level 2 --x 5921.6 --frames 560 --extra VC/overboss.js --out FX/engine/shots/over-mega.png, the same with --x 2451.6 (ROBO BEAR) and --level 1 --x 4821.6 (crab): no bar over the title (open the PNGs). compare-m1.sh 'over' identical (no boss there).
+- **Start from:** start-engine.json #5 (= combined #17, flowfix.json)
+
+### engine-6: flow-7
+
+- **What:** A way back to the title from pause. core.js KEYMAP: `quit: ['KeyQ']`. engine.js 'pause' case: `if (tap('quit')) { saveBest(); Music.stop(); G.state = 'title'; G.fade = 1; } else if (tap('pause') || tap('ok')) G.state = 'play';` (G.level stays, so the mission select opens on this mission; the next start rebuilds everything). screens.js drawPause music line: `'M: MUSIC ' + (Music.on ? 'ON' : 'OFF') + '   Q: QUIT TO TITLE'` (31 characters, fits the 248 px panel). docs: keys and Mission flow.
+- **Contract:** Engine only (policy exception c: Mission 1's pause screen gains the text).
+- **Tests:** 1) RR_GAME=R node T/harness.mjs render --level 2 --x 1200 --frames 300 --extra FX/tools/quitflow.js --out FX/engine/shots/q.png 2>&1 | grep '^QF' -> pause, title (music none, best 12345, level 1), missions, select, play (VIGO HILLS, score 0, lives 3, cam 0, intro true); the same with --level 1. 2) compare-m1.sh: pause differs only in box [453,450,992,473]. 3) regress.sh (nothing presses Q: Mission 1 sims identical).
+- **Start from:** start-engine.json #8, #9, #10 (planner edits, validated on FX/plan-work/shared.html)
+
+### engine-7: K8, flow-8
+
+- **What:** screens.js drawTitle hint: 'FREE THE PRISONERS FOR POWER-UPS!' -> 'RESCUE EVERYONE FOR POWER-UPS!' (30 characters; the parent may pick other words within the pixel font).
+- **Contract:** Engine only (policy exception c).
+- **Tests:** RR_GAME=R node T/harness.mjs render --screen title --out FX/engine/shots/title.png; compare-m1.sh: title differs from base and legacy only in box [426,564,1013,587].
+- **Start from:** start-engine.json #7 (planner edit, validated)
+
+### engine-8: flow-4
+
+- **What:** Engine half: screens.js drawSelect: `const L = LEVELS[0], M = LEVELS[G.level]; if (G.level > 0 && M && M.menuBG) M.menuBG(); else { L.drawBG(200); ctx.save(); ctx.translate(-200, 0); L.drawGround(200); ctx.restore(); }` (rest unchanged), so the hero select shows the chosen mission's scenery. docs: a menuBG() row (screen space, whole screen, every frame of the hero select; may build caches once; no G.p, no groundAt, no Math.random). The ALL MISSIONS COMPLETE screen keeps the jungle (verdict: can stay).
+- **Contract:** LEVELS[n].menuBG(): optional, set by level2.js on VIGO (level task flow-4). Absent, or Mission 1 chosen = the jungle as before.
+- **Tests:** 1) compare-m1.sh 'select' identical to base and legacy. 2) RR_GAME=R node T/harness.mjs render --screen select --extra VC/lvl1.js --out ...: on your root the jungle (no menuBG yet), errors []; on the both.html page (your root + start-level.json) the ria and hills behind the cards, errors [].
+- **Start from:** start-engine.json #6 (= combined #18, selectbg.json; validated)
+
+### engine-9: kids-7, flow-1
+
+- **What:** Engine half: screens.js drawPause, between the panel and the blinking prompt, while riding: `const ride = G.p && G.p.ride && RIDES[G.p.ride.type]; if (ride && ride.help) text(ride.help, W / 2, 174, '#8be0a8', 1, 'center');` so the pause screen shows the tractor's own keys (the exit Down+Z was never shown). docs: RIDES gains an optional help string.
+- **Contract:** RIDES[type].help: optional one-line string, set by vehicle.js (gear task kids-7: RIDES.tractor.help = 'C: CANNON   DOWN+Z: GET OUT'), read only here and only while G.p.ride. Absent = no line; Mission 1 has no rides.
+- **Tests:** RR_GAME=R node T/harness.mjs render --level 2 --x 2900 --frames 70 --extra FX/tools/cfg/rp-stub.js --extra FX/tools/ridepause.js --out FX/engine/shots/pause-ride.png 2>&1 | grep '^RP' -> 'state pause riding true help ...' and the green line between the panel and PRESS P (open the PNG). Without rp-stub on your root: no line, errors [].
+- **Start from:** start-engine.json #11 (planner edit, validated on FX/plan-work/shared.html)
+
+## Group: level
+
+Files: `src/level2.js`, `docs/level2-spec.md`
+
+**Notes.** Root R=/Users/macbookair/game/tools/review/fix/level/game. Start: python3 FX/tools/apply.py FX/edits/start-level.json all --files level2.js (toss, pows reorder, startText/startSay, menuBG), then the toss() helper and bugs-3, then the rest. The engine readers (startText, menuBG, clearMusic) are not in your root: test them on a both.html page built from your root plus FX/edits/start-engine.json. docs/level2-spec.md collects every Mission 2 design change of this round, including the other groups' (keep it in step with them): Rescues order; F fuel 240 / 300 (gear); layout table with AREA 4 and the 5450 checkpoint; music (square lead, bass up an octave, the victory track); the intro's ENTER: SKIP; the MEGA BEAR swipe now telegraphs 10 frames longer and never targets a rider, no DUCK!/JUMP! in the tractor (boss); the wolf skid no longer hurts and the ROBO BEAR charge box is lower (wild); BAIL OUT! and the tractor help line (gear). Edit only your own files, in place in /Users/macbookair/game/src (and your doc in /Users/macbookair/game/docs). Test on your root: RR_GAME=R node T/harness.mjs ... (other groups' files are pristine there). Never touch audio.js, heroes.js, weapons.js, main.js, manifest.json, nor the Mission 3 files (level3*.js, jetski.js, docs/level3-spec.md, tools/m3, proposals). At most 2 harness processes at a time (5 fixers share 8 CPUs; regress.sh defaults to 2). Scratch only in FX/<group>/work and FX/<group>/shots, running notes in FX/<group>/work/notes.md (append as you go, a restart wipes /private/tmp). Policy: no Math.random or rand() at load time or in draw code; match the file's idiom and sparse comments; pixel font glyphs only (A-Z 0-9 space ! ? . , : - ' / + > < & % ( )). Before handing over: python3 FX/tools/policycheck.py --group <group>, FX/tools/regress.sh FX/<group>/work/reg R (Mission 1 sims 10/10 identical to legacy, the Mission 1 sound log identical, Mission 2 10 sims win with errors [], flow 18/18, api 37/37, engine self-test DONE, loop-test ALL OK) and, if you touched anything Mission 1 can show, FX/tools/compare-m1.sh FX/<group>/shots/m1 R. To check a contract with another group's half, build a page from your root plus their start list: RR_SRC=R/src python3 FX/tools/mkvariant.py FX/<group>/work/both.html FX/edits/start-<other>.json, then run the harness with --html.
+
+### level-1: kids-4, K1
+
+- **What:** VIGO.update(), after `if (L2.worldUpdate) L2.worldUpdate();`: a freed animal's item is re-thrown toward where the hero will be when it lands (the engine drops it behind the animal, so riders and runners leave the H behind). Keep the validated detection (item it.t === 1, not tossed, a saluting pow at o.t === 40 with |o.x - 10 - (it.x - it.vx)| < 2) and move the throw into a helper shared with bugs-3, with the landing x kept on screen: `function toss(it) { const p = G.p, T = 38, v = p.ride ? p.ride.vx : p.vx, tx = clamp(p.x + v * T, G.cam.x + 24, G.cam.x + W - 24); it.tossed = true; it.vy = -3.4; it.vx = clamp((tx - it.x) / T, -4, 4); }`. Crate drops are left alone. engine.js stays unchanged (Mission 1's prisoners use the same drop).
+- **Contract:** level2.js only. New item field it.tossed (set and read here only). Reads engine fields G.items, G.pows (state, t, x), G.p.ride.vx, G.cam.x.
+- **Tests:** 1) RR_GAME=R node T/harness.mjs sim --level 2 --seed N --extra VE/fx/iobs.js 2>&1 | grep -A12 IOBS for N 1-5, heroes 0 and 1: S, F, R (unless the bot jumps over it), B and H 'collected', none 'lost'. 2) The same with VE/fx/wobs.js: R fired on foot, H used at the boss. 3) regress.sh (Mission 2 errors [], Mission 1 identical).
+- **Start from:** start-level.json #0 (= combined #0, plan.json toss, validated in plan.html), then the toss() helper with the on-screen clamp (planner change, not yet run)
+
+### level-2: kids-3, kids-9, flow-1
+
+- **What:** Level half: pows reorder: sheep 1550 'F' (was heart), pony 2300 'R' (was B), cow 3200 'B' (was R), goat 4600 'heart' (was F); the dogs 560 'S' and 5560 'H' stay. S, F and R are then collected and used on foot before the tractor (letters picked up inside the tractor replace each other) and the last pickup before the boss is the H, also for riders. Rewrite the comment above pows (shotgun before the first wolves, flame for the woods, rockets for the ROBO BEAR, grenades for the farm, the H for the MEGA BEAR). docs/level2-spec.md: the Rescues line and the F weapon line (240 fuel, 300 max). Not done: kids-3's optional rideHud weapon icon (no room in the ride panel, letters are taken on foot now) and flow-1's 'riders keep their weapon' (engine change).
+- **Contract:** Gear sets WEAPONS.flame ammo 240 / maxAmmo 300 (gear task kids-3); the spec words for it are written here. Each half is valid alone.
+- **Tests:** As kids-4 (iobs/wobs on seeds 1-5, both heroes): F taken on foot near 1550 and fired, R taken at 2300 on foot and fired in most runs, H the last pickup. Integration re-runs 20+ seeds.
+- **Start from:** start-level.json #1 (= combined #1, plan.json pows)
+
+### level-3: bugs-3
+
+- **What:** VIGO.update(), before the toss loop: an animal freed right before the camera moves on (the pony when the 2250 lock ends) is culled by updatePows before its drop at t 40. Catch every freed or saluting animal the next camera step (4 px at most) could cull: `for (const o of G.pows) if ((o.state === 'free' || o.state === 'salute') && o.t < 40 && o.x <= G.cam.x - 36) { const n = G.items.length; dropItem(o.item, G.cam.x + 20, o.y - 14, 1); o.state = 'salute'; o.t = 41; if (G.items.length > n) toss(G.items[n]); }` (o.t 41 skips the engine's drop at 40; the animal is off screen anyway).
+- **Contract:** level2.js only; uses toss() from kids-4.
+- **Tests:** Fixture adaptation owned here: copy VC/powcull.js to FX/level/work/powcull2.js; the pony now carries R and the drop can come from level2.js: count a drop when k equals the pony's item, and also print the hero's weapon and G.items at f 160. RR_GAME=R node T/harness.mjs sim --level 2 --x 2451.6 --god --seed 1 --frames 2000 --extra FX/level/work/powcull2.js 2>&1 | grep POWCULL -> k 0, 5, 10: the R drops and is collected (hero weapon rocket), k >= 15 as before (dropped at t 40, tossed).
+- **Start from:** none (planner design above)
+
+### level-4: kids-8, K2
+
+- **What:** A checkpoint before the MEGA BEAR: SECTIONS, rename the 4400 entry 'AREA 4: CHERRY ORCHARD' and add `{ x: 5450, name: 'FINAL AREA: THE BIG CHERRY TREES' }` (names are the parent's call; pixel font). A continue after x 5480 rebuilds with the camera at 5450, the hero at 5510, the dog with the H at 5560, no spawns (the last is at 5300) and the boss lock ahead. docs/level2-spec.md: the layout table row.
+- **Contract:** level2.js only. engine.js loadLevel needs a checkpoint equal to a section x (it is). The mission card shows '5 AREAS'; the harness's hitsBySection gets 5 entries.
+- **Tests:** 1) flow-selftest 18/18 (uses sections[1]). 2) RR_GAME=R node T/harness.mjs sim --level 2 --x 5921.6 --seed 1 --frames 1500 --extra FX/tools/cfg/bd-megabear-A-149.js --extra FX/tools/bossdeath2.js 2>&1 | grep '^RB' -> 'RB continue -> state play cam 5450 hero x 5510 checkpoint 5450 ... music vigo' (pre-fix cam 4400). 3) sims --level 2 --x 5460 seeds 1-3: win, errors []. 4) regress.sh.
+- **Start from:** none
+
+### level-5: audio-2
+
+- **What:** Animal calls about +9 dB (SOUNDS): sheep and goat tones 0.045 -> 0.13; pony 0.04 -> 0.12; cow 0.07 / 0.04 / 0.05 / 0.03 -> 0.15 / 0.09 / 0.11 / 0.07; dog tones 0.09 -> 0.14 and its noise 0.06 -> 0.1; hen 0.06 -> 0.08.
+- **Contract:** level2.js only.
+- **Tests:** Logs: RR_GAME=R node T/harness.mjs sim --level 2 --seed N --extra VE/snd/sndlog.js 2> FX/level/work/l2sN.log (N 1-3). node VE/snd/an.mjs cue LOG 'level2\.js:<line>' for each SOUNDS line (new numbers: grep -n): most rescues now at or above the rest of the mix (pre-fix sheep -13.5..-9.3 dB, cow -15.7..-11.5, goat -8.9..-1.9). node VE/snd/an.mjs iso LOG 'level2\.js:<line>': every peak below the shotgun blast's (pre-fix -10.2 dBFS). A by-ear check in a browser is advisable.
+- **Start from:** none (values from the verdict)
+
+### level-6: audio-7, K7, flow-10
+
+- **What:** The gaita jig's lead and bass, without audio.js (nobody edits it this round, so the verdict's leadVol is out): TRACKS.vigo `lead: 'square'` (was 'sawtooth': +4.4 LU at the scheduler's fixed 0.11, about Mission 1's lead level) and the bass an octave up: `bass: [50, 0, 57, 62, 0, 57]`. Update the comments ('reedy gaita lead') and the spec's music line.
+- **Contract:** level2.js only (TRACKS.vigo).
+- **Tests:** Predicted offline from a pre-fix log: MUSO='{"lead":"square","bassUp":true}' node VE/snd/an.mjs music LOG -> vigo lead -47.2 (main -48.2), bass laptop -42.3 (main -44.6), whole loop -38.0 full / -40.8 laptop (main -39.0 / -43.0; pre-fix vigo -38.9 / -44.8, lead -51.6). After the edit: node VE/snd/an.mjs music on a fresh log (no MUSO) gives that vigo row within 0.5 dB and an unchanged bearboss row (-38.8 / -41.5).
+- **Start from:** none (planner decision, measured with the offline synth)
+
+### level-7: audio-9
+
+- **What:** creak(): double it (tone volumes 0.03 / 0.03 / 0.025 -> 0.06 / 0.06 / 0.05, noise 0.03 -> 0.06) so the door creak in the opening scene is heard over the music.
+- **Contract:** level2.js only.
+- **Tests:** RR_GAME=R node T/harness.mjs sim --level 2 --seed 1 --frames 400 --extra VE/snd/sndlog.js 2> LOG; node VE/snd/an.mjs cue LOG 'level2\.js:<creak line>' -> about 0 dB or more vs the rest (pre-fix -6.5 dB).
+- **Start from:** none
+
+### level-8: kids-11
+
+- **What:** Intro draw: after the location caption fades (t > 130), while Enter can still skip (not skipped, t < IT.go), a small 'ENTER: SKIP' in the bottom letterbox bar (1x, a muted colour such as '#9aa3c0', right-aligned near W - 8). Keep the skip Enter-only (Z and X would skip by accident). docs: the intro paragraph.
+- **Contract:** level2.js only.
+- **Tests:** RR_GAME=R node T/harness.mjs render --level 2 --frames 200 --out ... (hint shown), --frames 100 (caption, no hint), --frames 290 (no hint); flow-selftest 18/18; Mission 2 sims '=base' with this change alone (draw only).
+- **Start from:** none
+
+### level-9: art-7
+
+- **What:** HELP! bubbles above the weather: move the speech-bubble block of drawTied into `function helpBubble(K, o)` (same pixels, translated to the cage, same blink from o.t + o.id * 37) and draw it from VIGO.drawOverlay after L2.drawOverlay: `ctx.save(); ctx.translate(-cx, 0); for (const o of G.pows) if (o.state === 'tied' && KINDS[o.kind]) helpBubble(KINDS[o.kind], o); ctx.restore();` (drawOverlay runs in screen space with the shake and cx = Math.round(G.cam.x): the world's transform). Rain, petals and butterflies then never cover HELP!. level2_sky.js is not touched.
+- **Contract:** level2.js only (calls the existing L2.drawOverlay hook first).
+- **Tests:** Renders of tied cages in weather: RR_GAME=R node T/harness.mjs render --level 2 --x 3651.6 --frames N (hen in the downpour) and --x 4451.6 (goat among petals) for a few N where the bubble is on; diff each against the same render of the base-game root (RR_GAME=FX/base-game): differences only around the bubbles. Mission 2 sims '=base' (draw only).
+- **Start from:** none
+
+### level-10: flow-2
+
+- **What:** Level half: VIGO `startText: 'MISSION 2 START!', startSay: 'Mission two, start!',` after the music fields. Optionally let the intro's at(IT.go) line use VIGO.startText / startSay so the words live in one place.
+- **Contract:** Read by engine.js (engine task flow-2) in loadLevel, beginMission and continueGame; without the engine half they are ignored.
+- **Tests:** Page with the engine half: RR_SRC=R/src python3 FX/tools/mkvariant.py FX/level/work/both.html FX/edits/start-engine.json; node T/harness.mjs sim --html FX/level/work/both.html --level 2 --x 1200 --frames 200 --extra VC/contrender.js 2>&1 | grep CONT -> 'MISSION 2 START!' and 'Mission two, start!'.
+- **Start from:** start-level.json #2 (= combined #16, flowfix.json)
+
+### level-11: flow-4
+
+- **What:** Level half: VIGO `menuBG() { if (L2.drawBG) L2.drawBG(0); else fallbackBG(0); }` with a one-line comment (the hero select behind the cards; builds the sky strips once).
+- **Contract:** Called by screens.js drawSelect (engine task flow-4) while VIGO HILLS is chosen: screen space, whole screen, no G.p, no groundAt, no Math.random. This moves K9's one-time sky build to the hero select.
+- **Tests:** both.html page (as flow-2): node T/harness.mjs render --html FX/level/work/both.html --screen select --extra VC/lvl1.js --out ... -> the ria and the hills behind the cards, errors [].
+- **Start from:** start-level.json #3 (= combined #19, selectbg.json)
+
+### level-12: flow-5
+
+- **What:** Level half: a short TRACKS.victory for the ALL MISSIONS COMPLETE screen (it loops): bright and celebratory, e.g. the jig's drone bass under a D-major tune at bpm 150, lead 'square', 4-8 bars, drums like vigo; commented like the other tracks. VIGO `clearMusic: 'victory'`. docs: the spec's music line.
+- **Contract:** engine.js (engine task flow-5) plays LV.clearMusic, else 'victory', at allclear endT 72 if the track exists, and stops it at the title. When Mission 3 (another session) becomes the last mission it gets this track through that fallback.
+- **Tests:** both.html page: node T/harness.mjs render --html FX/level/work/both.html --level 2 --x 5921.6 --god --frames 340 --extra FX/tools/menuflow2.js --out ... -> 'play:victory@212'. Loudness: node T/harness.mjs render --html FX/level/work/both.html --level 2 --screen allclear --frames 2400 --extra VE/snd/sndlog.js --out ... 2> LOG; node VE/snd/an.mjs music LOG -> the victory row within about 2 LU of vigo's (full and laptop).
+- **Start from:** none
+
+## Group: boss
+
+Files: `src/level2_boss.js`, `src/level1.js`
+
+**Notes.** Root R=/Users/macbookair/game/tools/review/fix/boss/game. Start: python3 FX/tools/apply.py FX/edits/start-boss.json 0 --files level2_boss.js,level1.js, measure art-1 alone (hp at f900 unchanged), then apply 1-8 and continue. level1.js gets the crab's two lines and nothing else (policy b): regress.sh must keep Mission 1 10/10 identical with the sound log identical. Edit only your own files, in place in /Users/macbookair/game/src (and your doc in /Users/macbookair/game/docs). Test on your root: RR_GAME=R node T/harness.mjs ... (other groups' files are pristine there). Never touch audio.js, heroes.js, weapons.js, main.js, manifest.json, nor the Mission 3 files (level3*.js, jetski.js, docs/level3-spec.md, tools/m3, proposals). At most 2 harness processes at a time (5 fixers share 8 CPUs; regress.sh defaults to 2). Scratch only in FX/<group>/work and FX/<group>/shots, running notes in FX/<group>/work/notes.md (append as you go, a restart wipes /private/tmp). Policy: no Math.random or rand() at load time or in draw code; match the file's idiom and sparse comments; pixel font glyphs only (A-Z 0-9 space ! ? . , : - ' / + > < & % ( )). Before handing over: python3 FX/tools/policycheck.py --group <group>, FX/tools/regress.sh FX/<group>/work/reg R (Mission 1 sims 10/10 identical to legacy, the Mission 1 sound log identical, Mission 2 10 sims win with errors [], flow 18/18, api 37/37, engine self-test DONE, loop-test ALL OK) and, if you touched anything Mission 1 can show, FX/tools/compare-m1.sh FX/<group>/shots/m1 R. To check a contract with another group's half, build a page from your root plus their start list: RR_SRC=R/src python3 FX/tools/mkvariant.py FX/<group>/work/both.html FX/edits/start-<other>.json, then run the harness with --html.
+
+### boss-1: art-1
+
+- **What:** drawBear: replace `FLASH = e.hitT > 2;` with a capped flash: `if (e.hitT >= 3 && G.t - (e.flashAt == null ? -99 : e.flashAt) >= 24) e.flashAt = G.t;` and `FLASH = G.t - (e.flashAt == null ? -99 : e.flashAt) < 2;` (`??` works too, engine.js uses it): 2 white frames at most every 24 frames, 2.5/s, instead of a 14.5 Hz strobe under the H.M.G.; sparks, clanks and plate debris still mark every hit. Draw only.
+- **Contract:** Boss only. Fixture adaptation owned here: VE/fx/flash.js counts hitT > 2 and no longer measures the bear; use VE/fx/flash2.js (reads e.flashAt).
+- **Tests:** RR_GAME=R node T/harness.mjs sim --level 2 --x 5921.6 --seed 1 --god --frames 905 --extra VE/fx/cfg-hmg.js --extra VE/fx/flash2.js 2>&1 | grep FLASH2, also cfg-pistol.js and cfg-flame.js: perSec <= 3 (pre-fix HMG 14.4, pistol 6.6; this edit alone 2.4 / 2.2 / 2.3) and, with only this edit applied, hp at f900 equal to pre-fix (HMG 301, pistol 387). The tractor gun is checked at integration.
+- **Start from:** FX/edits/start-boss.json #0 (= combined #3, flashfix.json, validated)
+
+### boss-2: kids-2
+
+- **What:** The swipe can be escaped from the wall on foot: REACH 136 -> 120 and the swipe slowed after the raise. rig() case 'swipe': every keyframe time >= 24 moves +10 (the claw-glint hold becomes 24-44), eye while st < 46, smear while 44 <= st < 60 with t: st - 44, glint 22 <= st < 44. stepSwipe: growl at 1, glint sound at 24, whoosh at 45, damage window st 45-52, sparks at 49, toIdle at 80. Update the comment in case 'swipe' (up 0-24, hold 24-44, sweep 44-52): the edit list leaves the old one.
+- **Contract:** Boss only. REACH also sets where the bear prowls (toIdle: tx = p.x + REACH + 8) and the swipe trigger (p.x > e.x - REACH + 4).
+- **Tests:** RR_GAME=R node T/harness.mjs sim --level 2 --x 5921.6 --seed 1 --god --frames 400 --extra VE/fx/lab-swipe.js 2>&1 | grep -A17 SWIPE -> walk wall-0 ok through rt 20, wall-5 through rt 25, wall-10 and more all ok (pre-fix wall-0 only rt <= 5; the lab's '35-42' label is stale). Mission 2 sims seeds 1-5: errors [], boss fight 45-75 s.
+- **Start from:** start-boss.json #1-#4 (= combined #4-#7, swipe10.json, validated in swipe10.html)
+
+### boss-3: kids-1, bugs-2
+
+- **What:** In the battle tractor: nextAttack `if (!p.dead && !p.ride && p.x > e.x - REACH + 4 && e.last !== 'swipe') return 'swipe';` (the tractor can't back off 50 px in time) and drawHint `if (!p || p.dead || p.ride) return;` (no DUCK!/JUMP! a rider can't obey; bugs-2's late LOW cue for riders is then moot). Not taken: bugs-2's 'riders dodge' alternative (HOP -4.4 retunes every tractor jump) and parking the tractor at 5600 (a parent's call).
+- **Contract:** Boss only; reads G.p.ride (engine field). The tractor (gear) is unchanged by this.
+- **Tests:** RR_GAME=R node T/harness.mjs render --level 2 --x 5921.6 --seed 1 --god --frames 3300 --extra FX/tools/ridenoswipe.js --out FX/boss/shots/rns.png 2>&1 | grep '^RNS' -> swipe 0, hints 0, laser >= 1, riding about 3000 frames (pre-fix swipe 7, hints 69). Mission 2 sims seeds 1-5 errors [].
+- **Start from:** start-boss.json #6, #7 (= FX/edits/kids1.json, planner edits validated with ridenoswipe.js)
+
+### boss-4: bugs-1, fuzz-2
+
+- **What:** level2_boss.js part: megabear onKill: replace the e.pups loop with `for (const w of G.enemies) if (w !== e && w.active && !w.dead && !w.dying && w.state !== 'dying') damageEnemy(w, 99);`, then `G.winT = 360;` (nothing hurts the hero from the kill on; bossDefeated at st 150 sets 210, the same win time) and `if (G.p.dead && G.lives <= 1) G.lives = 2;` (a hero already falling on the last life respawns and still wins). Not p.inv (the hero would blink through the victory); no engine change.
+- **Contract:** Uses the engine's existing G.winT guard in hurtPlayer and its win countdown. The engine group documents the pattern in docs/engine-api.md. The level1.js part (crab) is the next task.
+- **Tests:** RR_GAME=R node T/harness.mjs sim --level 2 --x 5921.6 --seed 1 --frames 1500 --extra FX/tools/cfg/bd-megabear-<M>-<K>.js --extra FX/tools/bossdeath2.js 2>&1 | grep '^RB' for M in A B C, K in 0 60 109 149 -> 'state win' in every case (at 670; A-60 730, A-109 779) except A-149 (hero dead 149 frames before the kill: GAME OVER as before); pre-fix all A and B and C-0 'over'. Also node T/harness.mjs sim --level 2 --x 5921.6 --seed 1 --frames 1200 --extra FW/cfg/be-hitDuring.js --extra FW/fx-bossend.js 2>&1 | grep '^BE' (and be-deadBefore.js, be-deadAfterWin.js) -> state=win. Mission 2 sims '=base' for this change alone.
+- **Start from:** start-boss.json #5 (= combined #10, bd-fix.json, validated)
+
+### boss-5: bugs-1
+
+- **What:** level1.js part (policy exception b, the MEGA CRAB has the same last-life death window): crab onKill, before `return 'dying';`: `G.winT = 360;` and `if (G.p.dead && G.lives <= 1) G.lives = 2;` with one short comment. Nothing else in level1.js (no leftover kill, no art, no balance).
+- **Contract:** Same pattern as the MEGA BEAR part.
+- **Tests:** RR_GAME=R node T/harness.mjs sim --level 1 --x 4821.6 --seed 1 --frames 1500 --extra FX/tools/cfg/bd-crab-<M>-<K>.js --extra FX/tools/bossdeath2.js 2>&1 | grep '^RB' for M in A B, K in 0 60 109 149 -> 'state win' (692-801 frames) except A-149 (GAME OVER, outside the window); pre-fix all 'over'. regress.sh: Mission 1 10/10 identical to legacy and the sound log identical. compare-m1.sh: 'crab' and 'x4620' identical.
+- **Start from:** start-boss.json #8 (= FX/edits/crab.json, validated: Mission 1 10/10 identical, window scenarios win)
+
+### boss-6: art-2
+
+- **What:** stepDying st 150: replace the small floating text with `G.big = { s: 'MEGA BEAR DOWN!', t: 130 };` (the dark band with 3x yellow text used for MISSION START!; it slides in as the flash fades; the win screen follows 210 frames later).
+- **Contract:** G.big is the engine's band (also the start band, flow-2); nothing else sets it at the kill.
+- **Tests:** Fixture adaptation owned here: VE/fx/killboss.js watches G.texts; copy it to FX/boss/work/killboss2.js and also log when G.big.s === 'MEGA BEAR DOWN!'. Renders: RR_GAME=R node T/harness.mjs render --level 2 --x 5921.6 --seed 1 --god --frames N --extra FX/boss/work/killboss2.js --out ... for N 480, 500, 530, 560 (kill at 300, st 150 at about 450): the band reads over the fading flash.
+- **Start from:** none
+
+### boss-7: audio-3
+
+- **What:** level2_boss.js part, warning sounds above the music's bass: sfx.grunt `Snd.tone('sawtooth', 260, 150, 0.3, 0.25); Snd.tone('square', 130, 80, 0.28, 0.08); Snd.noise(0.22, 0.22, 1600);`; sfx.rise `Snd.tone('sawtooth', 120, 420, 0.5, 0.2); Snd.noise(0.5, 0.18, 1400);`; sfx.growl `for (let i = 0; i < 4; i++) Snd.tone('sawtooth', 184 + i * 12, 140, 0.16, 0.2, i * 0.12);`; sfx.whine volume 0.05 -> 0.1.
+- **Contract:** Boss only (the wolf growl is wild's part).
+- **Tests:** Logged fights: RR_GAME=R node T/harness.mjs sim --level 2 --x 5921.6 --seed N --extra VE/snd/sndlog.js 2> LOG (N 1-3); node VE/snd/an.mjs cue LOG 'level2_boss\.js:<line>' for grunt, rise, growl and whine (new line numbers): median >= -3 dB (pre-fix grunt -10, rise -9..-3.4, growl -13..-5, whine -11..-8.5); an.mjs iso peaks below the shotgun's.
+- **Start from:** none (values from the verdict)
+
+### boss-8: audio-4
+
+- **What:** level2_boss.js part, a mid 'crunch' layer so the thuds survive laptop speakers (keep the low part, add): sfx.thud(v) add `Snd.tone('square', 160, 80, 0.14, 0.1 * v); Snd.noise(0.16, 0.3 * v, 1200);`; sfx.rumble add `Snd.noise(0.6, 0.3, 800); Snd.tone('sawtooth', 80, 50, 0.6, 0.08);`.
+- **Contract:** Boss only (the bears' heavy step is wild's part, the tractor landing gear's).
+- **Tests:** node VE/snd/an.mjs iso on the logs above for thud and rumble: laptop >= -46 (pre-fix thud -55.6, rumble -54.1); full range only about +1 dB.
+- **Start from:** none
+
+## Group: wild
+
+Files: `src/level2_enemies.js`, `src/level2_sky.js`
+
+**Notes.** Root R=/Users/macbookair/game/tools/review/fix/wild/game. Start: python3 FX/tools/apply.py FX/edits/start-wild.json all --files level2_enemies.js,level2_sky.js (kids-5 and kids-6, validated with the labs); the rest is written from the verdicts. Draw and sound changes (art-3, art-4, art-12, audio-3, audio-4, audio-8) must leave Mission 2 sims '=base' in regress.sh; kids-5 and kids-6 change gameplay (check errors [] and the labs). Edit only your own files, in place in /Users/macbookair/game/src (and your doc in /Users/macbookair/game/docs). Test on your root: RR_GAME=R node T/harness.mjs ... (other groups' files are pristine there). Never touch audio.js, heroes.js, weapons.js, main.js, manifest.json, nor the Mission 3 files (level3*.js, jetski.js, docs/level3-spec.md, tools/m3, proposals). At most 2 harness processes at a time (5 fixers share 8 CPUs; regress.sh defaults to 2). Scratch only in FX/<group>/work and FX/<group>/shots, running notes in FX/<group>/work/notes.md (append as you go, a restart wipes /private/tmp). Policy: no Math.random or rand() at load time or in draw code; match the file's idiom and sparse comments; pixel font glyphs only (A-Z 0-9 space ! ? . , : - ' / + > < & % ( )). Before handing over: python3 FX/tools/policycheck.py --group <group>, FX/tools/regress.sh FX/<group>/work/reg R (Mission 1 sims 10/10 identical to legacy, the Mission 1 sound log identical, Mission 2 10 sims win with errors [], flow 18/18, api 37/37, engine self-test DONE, loop-test ALL OK) and, if you touched anything Mission 1 can show, FX/tools/compare-m1.sh FX/<group>/shots/m1 R. To check a contract with another group's half, build a page from your root plus their start list: RR_SRC=R/src python3 FX/tools/mkvariant.py FX/<group>/work/both.html FX/edits/start-<other>.json, then run the harness with --html.
+
+### wild-1: kids-5
+
+- **What:** Wolf contact: `contact: e => e.state === 'pounce' || e.state === 'run' ? 'hurt' : 'none',` so the skid after a pounce no longer hurts: an early reflex jump that lands on the skidding wolf is safe (a hero standing still is still hit by the pounce). Also the MEGA BEAR's called wolves.
+- **Contract:** Wild only.
+- **Tests:** RR_GAME=R node T/harness.mjs sim --sandbox wolf --god --seed 1 --frames 8 --extra VE/fx/lab-wolf.js 2>&1 | grep -A7 '^WOLF' -> the safe jump frames start at 10 or earlier for d40, d60 and d72 (pre-fix 19; the edit gives 10). Mission 2 sims seeds 1-5 errors [].
+- **Start from:** FX/edits/start-wild.json #0 (planner edit, validated with lab-wolf: safe from frame 10)
+
+### wild-2: kids-6
+
+- **What:** bearBox, charge: `if (e.state === 'charge') return { x: e.x - 20 * S, y: e.y - 24 * S, w: 40 * S, h: 24 * S };` (was 48 x 30): jumping over a charging bear works in a wider window; standing shots at feet - 19 still hit it.
+- **Contract:** Wild only. The engine's 'block' push (F1) uses the walk/enter box, not this one.
+- **Tests:** RR_GAME=R node T/harness.mjs sim --sandbox bear --god --seed 1 --frames 8 --extra VE/fx/lab-charge.js 2>&1 | grep -A19 '^CHARGE' -> robobear 'in place' at least 10 ok at d70 and d110 (pre-fix 6 and 5; the edit gives 13 and 12, bear 17 and 17). Integration checks the ROBO BEAR lock is not trivial now that R comes at 2300.
+- **Start from:** FX/edits/start-wild.json #1 (planner edit, validated with lab-charge)
+
+### wild-3: audio-3
+
+- **What:** level2_enemies.js part: SFX.growl (the wolf's crouch warning): keep the low line and add a mid layer: `for (let i = 0; i < 5; i++) { Snd.tone('sawtooth', 300 - i * 10, 200, 0.08, 0.13, i * 0.09); Snd.noise(0.07, 0.1, 1500, i * 0.09); }`.
+- **Contract:** Wild only (the MEGA BEAR's sounds are boss's part).
+- **Tests:** Logged sims seeds 1-3 (VE/snd/sndlog.js): node VE/snd/an.mjs cue LOG 'level2_enemies\.js:<growl line>' -> median >= -3 dB (pre-fix -5.6 / -10.3 / -6.0, 0 of 36 louder than the rest).
+- **Start from:** none (values from the verdict)
+
+### wild-4: audio-4
+
+- **What:** level2_enemies.js part: SFX.heavy (bear footsteps): add `Snd.tone('square', 150, 75, 0.1, 0.07); Snd.noise(0.1, 0.2, 1200);` to the sine thud.
+- **Contract:** Wild only.
+- **Tests:** node VE/snd/an.mjs iso on a logged run with bears (--level 2 --x 3701.6 or --sandbox bear, with sndlog.js) for the heavy line: laptop >= -46 (pre-fix -57.5).
+- **Start from:** none
+
+### wild-5: art-3
+
+- **What:** Eagles in the downpour: in the eagle drawing (drawEagle's wings and drawEagleDive), while the rain is above 0.3, add a 1px METL top edge to the wings. Read L2.weather() once per frame (as level2_world.js weather() does); no Math.random or rand in draw code. The storm-cloud band in level2_sky.js stays as it is.
+- **Contract:** Reads L2.weather().rain (level2_sky.js, same group); absent = no edge.
+- **Tests:** Renders RR_GAME=R node T/harness.mjs render --level 2 --x 3801.6 --frames N and --x 3951.6, N 60 to 260 in steps of 40: wings read against the storm sky; outside the rain (--x 3201.6, 4851.6) identical to the base-game root. Mission 2 sims '=base'.
+- **Start from:** none
+
+### wild-6: art-4
+
+- **What:** Bear and ROBO BEAR legs in a warm dark palette so a wolf (grey metal) in front of them stays separate: drawBear's drawLeg `const c = near ? '#6a5a50' : '#4a3c34', hi = near ? '#8a7868' : null;` (or named constants). Wolves unchanged (they are also on the mission card).
+- **Contract:** Wild only.
+- **Tests:** Renders --level 2 --x 3801.6 at frames 60 and 120 (a wolf in front of a bear) and the 2250 lock (--x 2451.6, frames 100-200). Mission 2 sims '=base'.
+- **Start from:** none
+
+### wild-7: art-12, K3
+
+- **What:** level2_sky.js: FADE 150 -> 90, so the area crossfades double-expose the scenery for about 1.8 s of walking instead of 3 s (the SCN camera ranges stay valid). Not done: the 'solid gate' alternative (trunks, hedge arch, stone gate in drawFront; larger).
+- **Contract:** Wild only (weights() is draw-only).
+- **Tests:** Renders across each band at 30 px camera steps (camera c = x - 201.6): c 1170-1530, 2670-3030, 4220-4580, frame 60: shorter overlap, no hole or seam. Mission 2 sims '=base' (level2_sky.js never calls Math.random).
+- **Start from:** none
+
+### wild-8: audio-8
+
+- **What:** Rain sound: in L2.skyUpdate after weatherNow(): `if (WX.rain > 0.05 && T % 6 === 0) Snd.noise(0.3, 0.04 + 0.03 * WX.rain, 6000);` (about -47 LUFS in the drizzle, -43 in the downpour, under the music; skyUpdate doesn't run while paused; keep it out of skyLoad's warm-up loop). Not done: the optional thunder (no lightning to sync it with).
+- **Contract:** Wild only.
+- **Tests:** RR_GAME=R node T/harness.mjs sim --level 2 --x 3101.6 --seed 1 --god --frames 1400 --extra VE/fx/tr-farm.js --extra VE/fx/tractor.js --extra VE/snd/sndlog.js 2> LOG (the POS lines give x per second); node VE/snd/an.mjs win LOG t0 t1 FX/wild/work/rain.wav 'level2_sky' for a 3 s window in the drizzle (x 3200-3400) and one in the downpour (camera at the 3500 lock) -> about -47 and -43, below the music (-39) and the tractor gun; no rain calls before x 3150. Mission 2 sims '=base' (sound only).
+- **Start from:** none
+
+## Group: gear
+
+Files: `src/level2_world.js`, `src/vehicle.js`, `src/weapons_extra.js`
+
+**Notes.** Root R=/Users/macbookair/game/tools/review/fix/gear/game. Start: python3 FX/tools/apply.py FX/edits/start-gear.json all --files level2_world.js,vehicle.js,weapons_extra.js (flame ammo, tilt, flag). Draw-only changes (art-6, art-8, art-10) and sound changes must leave Mission 2 sims '=base' when checked alone (Snd calls never touch Math.random in the harness); the tilt and the flame ammo change Mission 2 gameplay. Edit only your own files, in place in /Users/macbookair/game/src (and your doc in /Users/macbookair/game/docs). Test on your root: RR_GAME=R node T/harness.mjs ... (other groups' files are pristine there). Never touch audio.js, heroes.js, weapons.js, main.js, manifest.json, nor the Mission 3 files (level3*.js, jetski.js, docs/level3-spec.md, tools/m3, proposals). At most 2 harness processes at a time (5 fixers share 8 CPUs; regress.sh defaults to 2). Scratch only in FX/<group>/work and FX/<group>/shots, running notes in FX/<group>/work/notes.md (append as you go, a restart wipes /private/tmp). Policy: no Math.random or rand() at load time or in draw code; match the file's idiom and sparse comments; pixel font glyphs only (A-Z 0-9 space ! ? . , : - ' / + > < & % ( )). Before handing over: python3 FX/tools/policycheck.py --group <group>, FX/tools/regress.sh FX/<group>/work/reg R (Mission 1 sims 10/10 identical to legacy, the Mission 1 sound log identical, Mission 2 10 sims win with errors [], flow 18/18, api 37/37, engine self-test DONE, loop-test ALL OK) and, if you touched anything Mission 1 can show, FX/tools/compare-m1.sh FX/<group>/shots/m1 R. To check a contract with another group's half, build a page from your root plus their start list: RR_SRC=R/src python3 FX/tools/mkvariant.py FX/<group>/work/both.html FX/edits/start-<other>.json, then run the harness with --html.
+
+### gear-1: art-6
+
+- **What:** level2_world.js REACH.flag [4, 30] -> [26, 30]: the Galician flag at x 2986 no longer pops in at the right screen edge when the wind blows its cloth to the left.
+- **Contract:** Gear only.
+- **Tests:** RR_GAME=R node T/harness.mjs render --level 2 --x 2695.6 --frames 400 vs the same render on RR_GAME=FX/base-game: the cloth now at the right edge (diff box there); frame 1 identical. Mission 2 sims '=base'.
+- **Start from:** start-gear.json #2 (= combined #9, flag.json)
+
+### gear-2: art-8
+
+- **What:** Neighbouring trees of a kind no longer identical: at load, mirrored copies of CHEST_TOP and CHERRY_TOP (img and the white FLASH copy flipped horizontally; ox/oy unchanged, the canopies are centred on o.x) and a deterministic pick so neighbours alternate (e.g. by the tree's index among the level's props of its kind; chestnuts 1480 1700 1940 2370 2560 2690, cherries 300 4470 4690 4880 5130 5400). No Math.random. Canopy boxes are symmetric about o.x, so gameplay doesn't change; check the swayBlit offsets on the mirrored copy.
+- **Contract:** Gear only.
+- **Tests:** Renders --level 2 --x 2451.6 and --x 4801.6, frame 60: no two identical neighbours; a shot canopy still flashes white with the mirrored copy. Mission 2 sims '=base'.
+- **Start from:** none
+
+### gear-3: art-10
+
+- **What:** zoneAt: `const j = (nz(x >> 1, y >> 1) - 0.5) * 128;` (±64 px instead of ±16), so the soil colour change at area borders is dithered over a wide band instead of a faint vertical seam.
+- **Contract:** Gear only (zoneAt only feeds drawing: check its callers).
+- **Tests:** Renders --x 2901.6, 1551.6 and 4601.6 (frame 60). Mission 2 sims '=base'.
+- **Start from:** none
+
+### gear-4: audio-1
+
+- **What:** Flamethrower heard while held: the hiss `if (G.t - hissT >= 6) { hissT = G.t; Snd.noise(0.3, 0.25, 1500); }` and add `Snd.noise(0.3, 0.15, 2000);` to the start whoosh.
+- **Contract:** Gear only.
+- **Tests:** RR_GAME=R node T/harness.mjs sim --sandbox wolf,wolf,wolf --god --frames 1200 --seed 1 --extra VE/snd/cfg-flame.js --extra VE/snd/arm.js --extra VE/snd/sndlog.js 2> LOG; node VE/snd/wl.mjs LOG 'weapons_extra\.js:(<whoosh line>|<hiss line>)' -> sustained -41 +- 2 (pre-fix -47.5; pistol -40.6).
+- **Start from:** none (values from the verdict)
+
+### gear-5: audio-6
+
+- **What:** Shotgun blast about 4 LU down: `Snd.noise(0.32, 0.27, 1300); Snd.tone('sine', 160, 45, 0.28, 0.25); Snd.tone('square', 110, 55, 0.1, 0.06);` (the pump-click line after it unchanged). Not done: the same-frame hit-sound guard in engine.js damageEnemy (it would change Mission 1's hit sounds).
+- **Contract:** Gear only.
+- **Tests:** Sandbox as audio-1 with VE/snd/cfg-shotgun.js: node VE/snd/wl.mjs LOG 'weapons_extra\.js:(<blast line>|<click line>)' -> -35 or quieter (pre-fix -31.6, peak -10.2 dBFS), still the punchiest gun.
+- **Start from:** none (values from the verdict)
+
+### gear-6: audio-5
+
+- **What:** The tractor's engine while driving (exhaust): `if (!quiet) { Snd.tone('sawtooth', hard ? 110 : 95, 70, 0.1, hard ? 0.15 : 0.12); Snd.noise(0.09, hard ? 0.14 : 0.11, 1000); }`. Parked tractors stay quiet.
+- **Contract:** Gear only.
+- **Tests:** Ride log: RR_GAME=R node T/harness.mjs sim --level 2 --x 4251.6 --seed 1 --god --frames 1100 --extra VE/fx/tr-right.js --extra VE/fx/tractor.js --extra VE/snd/sndlog.js 2> LOG; node VE/snd/wl.mjs LOG 'vehicle\.js:<exhaust line>' -> about -42 sustained (laptop about -46); with a fire cfg (var TR_CFG = { right: true, fire: true, end: 1100, to: 5700 };) the gun line stays louder (pre-fix -40.9).
+- **Start from:** none (values from the verdict)
+
+### gear-7: audio-4
+
+- **What:** vehicle.js part: the hard landing gets the same mid layer as the bears' step: add `Snd.tone('square', 150, 75, 0.1, 0.08); Snd.noise(0.1, 0.18, 1200);` to `Snd.noise(0.14, 0.22, 420); Snd.tone('sine', 120, 45, 0.14, 0.2);`.
+- **Contract:** Gear only.
+- **Tests:** node VE/snd/an.mjs iso on a ride log with hops (the ride log above, or a run over the farm) for the landing line: laptop >= -46 (pre-fix -49.1).
+- **Start from:** none
+
+### gear-8: art-11, K14
+
+- **What:** vehicle.js tilt threshold 0.025 -> 0.045 (`const tilt = rot => Math.abs(rot) < 0.045 ? 0 : ...`): no jagged 2-degree rotation on the whole orchard hill, only on steep slopes. tilt() also aims the nose gun and the cannon (dirOf uses v.rot): on the hill they now fire level (a small Mission 2 gameplay change).
+- **Contract:** Gear only.
+- **Tests:** Renders of a ride on the orchard hill: RR_GAME=R node T/harness.mjs render --level 2 --x 4251.6 --frames 300 (and 500) --extra VE/fx/tr-right.js --extra VE/fx/tractor.js: straight pixels, wheels on the ground (VE/fx/tractor.js's TILT line only mirrors its own thr). Mission 2 sims errors [].
+- **Start from:** start-gear.json #1 (= combined #8, tilt.json)
+
+### gear-9: kids-7, flow-1
+
+- **What:** Gear half: wreck(): 'JUMP!' -> 'BAIL OUT!' (the hero is thrown clear automatically); RIDES.tractor gains `help: 'C: CANNON   DOWN+Z: GET OUT'`; boardIt, inside `if (!r.hello)`: also `G.texts.push({ x: o.x, y: gl.y - 70, s: RIDES.tractor.help, t: 160, c: '#ffffff' });` under BATTLE TRACTOR!.
+- **Contract:** RIDES.tractor.help is read by screens.js drawPause while riding (engine task kids-7); without the engine half it only feeds the boarding text.
+- **Tests:** Render the first boarding: RR_GAME=R node T/harness.mjs render --level 2 --x 2900 --frames 40 --extra VE/fx/tractor.js --out ... (the tractor is put under the hero at frame 2): both texts readable. The wreck: a small fixture that sets p.ride.armour = 1 and calls hurtPlayer() with p.inv 0, render 10 frames later: BAIL OUT!. On a both.html page (your root + FX/edits/start-engine.json): FX/tools/ridepause.js without the stub shows the tractor's help.
+- **Start from:** none
+
+### gear-10: kids-3, kids-9, flow-1
+
+- **What:** Gear half: WEAPONS.flame `ammo: 240, maxAmmo: 300` (12 s of held fire like the other weapons; it was 6 s).
+- **Contract:** The level's pows reorder gives the flame on foot at 1550 (level task kids-3); the spec text is written by the level group.
+- **Tests:** Sandbox flame (as audio-1): the HUD shows 240 at the start (render) or log WEAPONS.flame.ammo; integration: wobs.js shows well over 120 flame shots when F is held.
+- **Start from:** start-gear.json #0 (= combined #2, plan.json flame)
+
+## Skipped
+
+- **bugs-4, fuzz-3**: Skipped by policy: the never-drawn NaN explosion 'flash' particle is harmless; giving it vx/vy would add a white flash to every explosion in both missions (Mission 1's explosions never showed one) and a fading disc every 7 frames during the MEGA BEAR's death, against art-1.
+- **bugs-5**: Skipped by policy: harness-only effect (draw cadence changes seeded results). The game-side hashed shake breaks Mission 1's byte-for-byte parity with backup/index-before-level2.html (measured: seed 1 [0,0,5,9] 140.3 s -> [0,0,4,11] 147.6 s). If wanted later, change only harness.mjs (a second seeded stream around draw()) and re-take the baselines.
+- **art-9**: Skipped by policy: large effort (pre-rotated boss parts in 8-16 steps), mild stair-stepping only visible at 6x, regression risk in the boss art.
+- **flow-9, K9**: No change needed (the verdict's own conclusion): the one-time sky-strip build (about 0.3 s in Chrome) happens during the fade-in of the first Mission 2 start; with flow-4's menuBG (engine and level tasks) it moves to the hero-select screen when VIGO HILLS is chosen. A stepwise build during the menus would be medium effort in level2_sky.js for no visible gain.
+
+## Cross-file contracts
+
+All cross-file fields are optional with defaults that keep the old behaviour, so each half works and is testable alone (a group tests the other half on a page built from its root plus the other group's FX/edits/start-<group>.json).
+
+- C1 LV.startText / LV.startSay (flow-2): level2.js sets VIGO.startText = 'MISSION 2 START!', VIGO.startSay = 'Mission two, start!'; engine.js reads them in loadLevel (G.big), beginMission (say, no intro) and continueGame (say). Defaults 'MISSION START!' / 'Mission start!'.
+
+- C2 LEVELS[n].menuBG() (flow-4): level2.js sets VIGO.menuBG() = L2.drawBG(0) or fallbackBG(0) (screen space, whole screen, no G.p, no groundAt, no Math.random); screens.js drawSelect calls it when G.level > 0 and it exists. Default: the jungle.
+
+- C3 LV.clearMusic + TRACKS.victory (flow-5): level2.js defines TRACKS.victory and VIGO.clearMusic = 'victory'; engine.js at allclear endT 72 plays LV.clearMusic || 'victory' only if TRACKS has it, and Music.stop() when Enter goes to the title. Default: silence, no warning. Mission 3 (another session) inherits the victory track through the fallback.
+
+- C4 RIDES[type].help (kids-7, flow-1): vehicle.js sets RIDES.tractor.help = 'C: CANNON   DOWN+Z: GET OUT' (also shown once at the first boarding); screens.js drawPause draws it at y 174 while G.p.ride. Default: no line.
+
+- C5 Flame fuel (kids-3, kids-9): weapons_extra.js WEAPONS.flame ammo 240 / maxAmmo 300 (gear); level2.js gives F at the sheep (1550) and level2-spec.md states 240 (level).
+
+- C6 Boss death window (bugs-1): level2_boss.js megabear onKill and level1.js crab onKill set G.winT = 360 at the kill and revive a falling last-life hero (lives 2); engine.js unchanged (hurtPlayer already returns while G.winT > 0; bossDefeated sets 210 at st 150, the same win time); engine-api.md documents the pattern (engine).
+
+- C7 Item toss (kids-4, bugs-3): level2.js only; new item field it.tossed; reads engine fields G.items, G.pows, G.p.ride.vx, G.cam.x (unchanged).
+
+- C8 Checkpoint 5450 (kids-8): level2.js SECTIONS; engine.js loadLevel needs a checkpoint equal to a section x (it is); continues and the start band (C1) work there unchanged.
+
+- C9 Weather for the eagles (art-3): level2_enemies.js reads L2.weather().rain from level2_sky.js (same group, existing API).
+
+- C10 HELP! bubbles (art-7): level2.js VIGO.drawOverlay draws them after calling L2.drawOverlay; level2_sky.js unchanged.
+
+- C11 Riders at the boss (kids-1): level2_boss.js reads G.p.ride; vehicle.js unchanged by it. The F1 clamp (engine) and the bear's charge box (wild) do not share a box: the push uses the walk/enter box.
+
+- C12 Docs: docs/engine-api.md (engine) documents C1-C4, C6, the quit key and the block-push clamp; docs/level2-spec.md (level) collects every Mission 2 design change of every group.
+
+
+## Mission 1 changes
+
+Mission 1 must play, look and sound exactly as before in normal play. Proven on the composed starting point (FX/plan-work/allstart.html = all five start lists, 31 edits): Mission 1 sims seeds 1-5 x heroes 0/1 byte-identical to backup/index-before-level2.html (10/10), the Mission 1 sound log of seed 1 identical event by event (1928 events, sndcmp.py), renders identical except the two intended screens. Allowed and documented exceptions: (a) F1, the engine.js push clamp: only frames where a 'block' enemy would push the hero off screen change; in Mission 1 that is the tank at the 3720 lock (edgepush 17 of 76 jump timings off screen -> 0; sims and renders identical). (b) The MEGA CRAB onKill in level1.js (G.winT = 360 and the revive line, nothing else): only a last-life death inside the crab's ~4 s death window changes, from GAME OVER and a second crab fight to the win (bossdeath2.js, crab A/B 0/60/109/149 -> win, A-149 outside the window unchanged); sims identical. (c) Shared screens: the title hint (K8: box [426,564,1013,587] at scale 3), the pause screen's Q: QUIT TO TITLE (flow-7: box [453,450,992,473]) and the boss bar hidden on GAME OVER (flow-6, only during a boss fight). Changes that cannot reach Mission 1: flow-2's defaults keep MISSION START!/'Mission start!'; flow-3 and flow-5 run only after the last mission; flow-4 keeps the jungle when Mission 1 is chosen; kids-7's pause line needs a ride. Not done because they would change Mission 1: audio-6's engine hit-sound guard, bugs-4, bugs-5. The win screen's PRESS ENTER FOR MISSION 2! (vs legacy) predates this round. audio.js, heroes.js, weapons.js, main.js and manifest.json are not edited.
+
+## Tests for every group
+
+T=/Users/macbookair/game/tools/harness; RD=/Users/macbookair/game/tools/review; FX=RD/fix (tools FX/tools, edit lists FX/edits, baselines FX/baseline); R=FX/<group>/game, the group's RR_GAME root (its own files are the live src, every other file the pristine snapshot FX/src-base); VE=RD/verify-experience-work (labs VE/fx, sound tools VE/snd: sndlog.js, an.mjs, wl.mjs); VC=RD/verify-code-work (fixtures); FW=RD/fuzz-work (fx-*.js, cfg/). 'start-<group>.json #n' = entry n (0-based) of FX/edits/start-<group>.json, a copy of validated exact-string edits; apply with python3 FX/tools/apply.py FX/edits/start-<group>.json <entries> --files <your files>.
+
+Every group, before handing over (on its root R):
+
+1) FX/tools/regress.sh FX/<group>/work/reg R [N]: Mission 1 sims seeds 1-5 x heroes 0/1 byte-identical to the legacy baseline (FX/baseline/m1-leg-*.json), the Mission 1 sound log of seed 1 identical to legacy (sndcmp.py), Mission 2 sims seeds 1-5 x heroes 0/1 (state win, errors []; '=base' marks a run byte-identical to the pre-fix build, expected for draw- and sound-only changes), flow-selftest 18 ok, api-fixes 37 ok, engine-selftest DONE, loop-test ALL OK. Ends with RESULT: ALL PASS.
+
+2) FX/tools/compare-m1.sh FX/<group>/shots/m1 R when the group touches anything Mission 1 can show (engine, boss): expected only title [426,564,1013,587] and pause [453,450,992,473] (engine), win differs from legacy in its prompt line only (pre-existing).
+
+3) python3 FX/tools/policycheck.py --group <group>: own files only; flags pixel-font glyph problems in new display strings and lists every added Math.random / rand( line for review (update code only, never load time or draw code).
+
+4) The task tests listed per task. Labs and fixtures: VE/fx (flash2.js, lab-swipe.js, lab-tractor-boss.js, lab-wolf.js, lab-charge.js, iobs.js, wobs.js, tractor.js + tr-*.js, killboss.js), VC (edgepush.js + cfg-*.js, powcull.js, contrender.js, overboss.js, lvl1.js, bossdeath.js), FW (fx-sandwich.js, fx-push.js, fx-bossend.js + cfg/be-*.js), FX/tools (bossdeath2.js + cfg/bd-*.js, quitflow.js, ridepause.js + cfg/rp-stub.js, menuflow2.js + cfg/victory-stub.js, ridenoswipe.js, lockobs.js). Sound: VE/snd/sndlog.js logs every Snd call with its caller 'file:line' (regexes must use the NEW line numbers: grep -n), node VE/snd/an.mjs music|src|cue|iso|win LOG ..., node VE/snd/wl.mjs LOG REGEX (sustained weapon loudness); MUSO='{"lead":...,"bassUp":true}' previews track changes offline.
+
+Other tools: FX/tools/mkvariant.py out.html list.json [...] (single-file page from FX/src-base or $RR_SRC plus edit lists; run with --html), FX/tools/apply.py (apply edit-list entries to your live files; --check), FX/tools/pool.py jobs.txt N (shell jobs N at a time), FX/tools/sndcmp.py A.log B.log. Pristine references: FX/base-game (RR_GAME root of the pre-fix tree), FX/baseline (sim JSONs, sound logs, png/). Fixture runs that end on the title or need every frame drawn use 'render' (sim stops at win, allclear and title).
+
+Pre-fix reference numbers: Mission 2 sims seeds 1-5 win in 181.6 / 180.1 / 176.1 / 180.4 / 177.4 s, 2 deaths each, 0 continues; heroes 0 and 1 give identical JSON (the bot; heroes differ only in art).
+
+
+## Integration
+
+The integrator works on the real tree (no RR_GAME) once all five groups are done, scratch in RD/after, notes RD/after/notes.md.
+
+1) Ownership: python3 FX/tools/policycheck.py --group all -> only the 11 owned src files changed (audio.js, heroes.js, weapons.js, main.js, manifest.json identical to FX/src-base; no Mission 3 file added to the manifest), no glyph problems, every random call reviewed.
+
+2) FX/tools/regress.sh RD/after/reg (N 3): RESULT ALL PASS (Mission 1 10/10 identical to legacy, sound log identical, Mission 2 10 runs win errors [], flow 18, api 37, selftest DONE, loop-test ALL OK). FX/tools/compare-m1.sh RD/after/m1: only title [426,564,1013,587] and pause [453,450,992,473] differ from base and legacy (win: the pre-existing prompt line vs legacy).
+
+3) Mission 2 balance with everything in: sims seeds 1-20 x heroes 0/1 with VE/fx/iobs.js and VE/fx/wobs.js: errors [] everywhere, S/F/H always collected and used (F well over 120 shots), R picked at 2300 on foot and fired in most runs, H used at the boss; continues mostly 0; time roughly 2.5-3.5 min (pre-fix ~3 min; the plan variants gave 152-171 s); hits per run <= 22 (spec target). Boss fight 45-75 s on foot with the pistol (spec): sims from --x 5921.6.
+
+4) Locks with everything in (FX/tools/lockobs.js on the seeds of step 3): the ROBO BEAR lock at 2250 must stay a fight (pre-fix 17.8-21.3 s for seeds 1-5, the composed starting point 12.6-20.0 s; with the new charge box and rockets it should not drop much below ~10 s); the boss lock 45-75 s (pre-fix 57.7-59.9 s, starting point 47.9-51.9 s). K10: rockets fired during the 2250 lock should explode on robots, not in the chestnut canopies (wrap the global blast() during that lock and look at the y of rocket blasts).
+
+5) Boss together (boss + engine + gear): FX/tools/ridenoswipe.js (swipe 0, hints 0), VE/fx/lab-swipe.js (wall-0 ok through rt 20), VE/fx/flash2.js with hmg, pistol, flame and a rider's tractor gun (<= 3 onsets/s), FX/tools/bossdeath2.js megabear A/B/C x 0/60/109/149 (win, A-149 over) and crab A/B (win, A-149 over), FW/fx-bossend.js (be-hitDuring, be-deadBefore, be-deadAfterWin -> win), the kill renders with the MEGA BEAR DOWN! band. Report to the lead, without changing it (not a verdict): the boss death's full-screen pulses (stepDying st 118-150, G.sflash 0.12 every 4 frames, about 15 Hz at 12%), the one flash pattern the art-1 fix does not cover.
+
+6) Flow together: VC/contrender.js at --x 5921.6 after the checkpoint: continue at cam 5450 with MISSION 2 START! and 'Mission two, start!', music vigo, bearboss at the lock (bossdeath2 A-149 line shows cam 5450 and music vigo); FX/tools/menuflow2.js: play:victory at allclear endT 72, music none at the title, then ROBOT JUNGLE; FX/tools/quitflow.js on both missions; render --screen select --extra VC/lvl1.js shows the ria; FX/tools/ridepause.js (no stub) shows C: CANNON   DOWN+Z: GET OUT; the first boarding shows the help text, a wreck says BAIL OUT!; F1: VC/edgepush.js bear and tank 0 of 76, FW/fx-sandwich.js visible.
+
+7) Pictures: art-7 (hen at 3800 in the downpour: HELP! over the rain), art-3/art-4 (x 3801.6), art-12 bands, art-8 trees, art-10 seams, art-6 flag, art-11 orchard hill, kids-11 intro hint; open each PNG.
+
+8) Sound balance with everything in: sndlog on Mission 2 seeds 1-3: an.mjs cue for the animal calls, wolf growl, MEGA BEAR grunt/rise/growl/whine (median >= -3 dB), an.mjs iso for thud, rumble, heavy step and tractor landing (laptop >= -46), wl.mjs for flame (-41 +- 2) and shotgun (<= -35), the tractor engine below its gun, the rain under the music, an.mjs music for vigo and victory; no new clipping (peaks below the shotgun's). Mission 1 sound log identical (regress).
+
+9) Build: python3 /Users/macbookair/game/build.py -> index.html; node T/loop-test.mjs built -> ALL OK; node T/harness.mjs sim --html /Users/macbookair/game/index.html: Mission 1 seeds 1-5 byte-identical to legacy, Mission 2 seeds 1-5 win errors []. Optional fuzz smoke with FW/fuzz2-frozen-b.js at --x 3701.6, 2451.6 and 5921.6 (no heroOffScreen, errors []).
+
+10) Docs match what shipped: docs/engine-api.md (startText, startSay, clearMusic and the victory fallback, menuBG, RIDES help, the quit key, the block-push clamp, G.winT at a boss kill) and docs/level2-spec.md (rescue order, flame fuel, the 5450 checkpoint, music, intro hint, boss, wolf, bear and tractor changes).
+
+
+## Composition check (planner, 2026-11-11)
+
+- `FX/edits/combined.json` (20 validated edits: plan, flashfix, swipe10, tilt, flag, bd-fix, f1-engine, flowfix, selectbg) applies cleanly to src-base. Mission 1 seeds 1-5 x heroes 0/1 byte-identical to legacy (10/10), also with `crab.json` (10/10); Mission 1 sound log seed 1 identical (1928 events). Mission 2 seeds 1-5 win, errors [], 152.2 / 170.6 / 158.8 / 169.3 / 158.2 s (pre-fix 181.6 / 180.1 / 176.1 / 180.4 / 177.4), deaths 0-2, 0 continues. flow 18/18, api 37/37, engine self-test DONE.
+- Boss windows: MEGA BEAR pre-fix A/B -> GAME OVER, combined -> win in every case inside the window (670-779 frames); MEGA CRAB pre-fix -> GAME OVER, crab.json -> win (692-801 frames); A-149 (outside the window) unchanged in both.
+- `shared.json` (planner: K8, flow-7, kids-7 pause line, flow-5 engine half) on top of combined: regress ALL PASS; compare-m1 title [426,564,1013,587] and pause [453,450,992,473] only; quit, ride-pause and victory-music flows as expected.
+- `kids1.json`: ridenoswipe swipe 7 / hints 69 -> 0 / 0.
+- `start-wild.json` (kids-5, kids-6): lab-wolf safe from frame 10 (was 19); lab-charge ROBO BEAR in place 13 / 12 frames at d70 / d110 (was 6 / 5).
+- All five `start-<group>.json` together (31 edits, `FX/plan-work/allstart.html`): regress ALL PASS: Mission 1 10/10 identical to legacy, sound log identical, Mission 2 152.4 / 171.3 / 160.6 / 168.1 / 160.9 s, 0 continues, flow 18/18, api 37/37, self-test DONE. Locks (lockobs.js, seeds 1-5, 29-edit page): ROBO BEAR 12.6-20.0 s (pre-fix 17.8-21.3), MEGA BEAR 47.9-51.9 s (pre-fix 57.7-59.9).

@@ -1,0 +1,27 @@
+# OS / editors / deps
+.DS_Store
+node_modules/
+__pycache__/
+
+# Old local copies of the game (git history replaces them; the folder stays on disk)
+/backup/
+
+# tools/: keep notes, contracts and scripts at tools/<task>/ level.
+# Agent scratch in sub-folders (work copies, renders, probes) stays local only.
+/tools/*/*/
+!/tools/harness/fixtures/
+!/tools/m4polish/sfx/
+/tools/m4polish/sfx/*/
+!/tools/m4polish/sfx/cut/
+# Higgsfield download links carry the account id
+/tools/m4polish/sfx/urls.txt
+/tools/**/*.png
+/tools/**/*.html
+/tools/**/*.wav
+/tools/**/*.log
+/tools/**/*.err
+/tools/**/*.out
+
+# Agent scratch anywhere
+/scratch/
+*.tmp
