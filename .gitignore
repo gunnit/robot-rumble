@@ -1,6 +1,6 @@
 # OS / editors / deps
 .DS_Store
-node_modules/
+node_modules
 __pycache__/
 
 # Old local copies of the game (git history replaces them; the folder stays on disk)
