@@ -21,6 +21,10 @@ A side-scrolling run-and-gun HTML5 canvas game (480x270) a parent is making for 
 
 Engine API for mission authors: `docs/engine-api.md`.
 
+Story across missions (THE OGGLE CASE FILE): `src/story.js` (briefings, clues, Case File, ending, dinosaur
+epilogue); notes and its test in `tools/audit/` (`node tools/audit/story-test.mjs`). A new mission needs a
+`BRIEF` entry and a clue there.
+
 ## Where things live
 
 - **Repo:** https://github.com/gunnit/robot-rumble (branch `main`)
