@@ -7,6 +7,7 @@
   const out = [], ok = (c, m) => out.push((c ? 'ok   ' : 'FAIL ') + m);
   const step = (n, key) => { for (let i = 0; i < n; i++) { if (key && i === 0) pressed[key] = true; update(); for (const k in pressed) delete pressed[k]; } };
   const last = LEVELS.length - 1;
+  if (typeof STORY !== 'undefined') STORY.enabled = false; // this checks the engine flow; tools/audit/story-test.mjs checks the story
   ok(LEVELS.length === 7 && LEVELS[6].title === 'THE LAST LIGHTHOUSE' && LEVELS[5].title === 'CLOCKFANG CAVERN' && LEVELS[4].title === 'ALIEN MOTHERSHIP' && LEVELS[1].title === 'VIGO HILLS' && LEVELS[2].title === 'VOLCANO ISLAND' && LEVELS[3].title === 'CORAL KINGDOM', 'missions loaded: ' + LEVELS.map(l => l.title).join(', '));
   // title -> missions -> select -> play
   G.state = 'title'; step(1, 'Enter'); ok(G.state === 'missions', 'title -> missions (' + G.state + ')');

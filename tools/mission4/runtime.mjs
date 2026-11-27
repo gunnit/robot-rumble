@@ -15,6 +15,6 @@ export function boot(seed=1, html=null){
   function input(actions=[]){for(const [name,key] of Object.entries(keymap)){const on=actions.includes(name);if(on&&!keys[key])pressed[key]=true;keys[key]=on;}}
   function step(n=1,actions=[],render=false){input(actions);for(let i=0;i<n;i++){get('update')();for(const k in pressed)delete pressed[k];if(render&&i%12===0)get('draw')();}}
   function start(level=4,x=100,hero=0,god=false){get('devStart')({level,x,hero,god});step(2);}
-  function shot(file){get('draw')();fs.mkdirSync(new URL('.', 'file://'+file),{recursive:true});fs.writeFileSync(file,canvas.toBuffer('image/png'));}
+  function shot(file){get('draw')();fs.mkdirSync(file.replace(/[/][^/]*$/,'')||'.',{recursive:true});fs.writeFileSync(file,canvas.toBuffer('image/png'));}
   return {get,run,step,start,input,canvas,errors,warnings,shot,storage};
 }
