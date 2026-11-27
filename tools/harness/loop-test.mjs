@@ -7,7 +7,7 @@ import { createRequire } from 'module';
 import fs from 'fs';
 import vm from 'vm';
 const HARN = decodeURIComponent(new URL('.', import.meta.url).pathname).replace(/\/$/, ''); // this folder
-const require = createRequire(HARN + '/harness.mjs');
+const require = createRequire(import.meta.url); // works on Windows paths too
 const { createCanvas } = require('@napi-rs/canvas');
 const GAME = process.env.RR_GAME || '/Users/macbookair/game', W = 480, H = 270;
 const kind = process.argv[2] || 'src';

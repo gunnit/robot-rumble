@@ -1,0 +1,2 @@
+(function(){const out=LEVELS.map((L,i)=>{const S=L.sections;return S.map((s,j)=>{const a=s.x,b=j+1<S.length?S[j+1].x:L.end;const sp=L.spawns.filter(q=>q.x>=a&&q.x<b);const ty={};sp.forEach(q=>ty[q.t]=(ty[q.t]||0)+1);
+return (i+1)+'.'+j+' '+s.name.padEnd(28)+' len '+(b-a)+' spawns '+sp.length+' per1k '+(sp.length*1000/(b-a)).toFixed(1)+' locks '+L.locks.filter(k=>k.at>=a&&k.at<b).map(k=>k.at+(k.boss?'B':'')+'x'+k.waves.length).join(',')+' pows '+L.pows.filter(p=>p.x>=a&&p.x<b).length+' '+JSON.stringify(ty)}).join('\n')}).join('\n');console.warn('DUMP'+out)})();
