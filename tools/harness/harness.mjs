@@ -332,9 +332,11 @@ function makeLighthousePilot(env) {
       if (Math.abs(x - machine) > 6) move(machine - x); else ring();
       return true;
     }
-    if (G.eb.some(b => b.life > 0 && Math.hypot(b.x - x, b.y - y) < 55)) ring();
+    // RR_NOCOUNTER=1: no combat bell (no reflects, no counters): the bot never dodges, like the bots of Missions 1-6
+    const counters = !process.env.RR_NOCOUNTER;
+    if (counters && G.eb.some(b => b.life > 0 && Math.hypot(b.x - x, b.y - y) < 55)) ring();
     const tell = G.enemies.find(e => e.active && !e.dead && (foes.counterReady ? foes.counterReady(e) : e.state === 'tell') && distance(x, y, box(e)) <= 122);
-    if (tell) ring();
+    if (counters && tell) ring();
     const lock = G.locks.find(l => l.active && !l.done);
     if (lock) {
       const boss = G.enemies.find(e => e.lock === lock && !e.dying && types[e.type].boss);
@@ -343,7 +345,7 @@ function makeLighthousePilot(env) {
         if (clasp) {
           const dx = clasp.x - x;
           if (Math.abs(dx) > 64 || (dx && p.facing !== Math.sign(dx))) move(dx);
-          if (distance(x, y, box(clasp)) < 90) ring();
+          if (counters && distance(x, y, box(clasp)) < 90) ring();
         }
         return true;
       }

@@ -346,7 +346,7 @@ const CaveBossArt6 = (() => {
     G.enemies.push(bat); sparks(x,133,6,rose);
   }
   const queen={
-    hp:64,boss:true,bossName:queenName,flying:true,edge:26,
+    hp:50,boss:true,bossName:queenName,flying:true,edge:26,
     contact:e=>e.state==='swoop'?'hurt':'none',
     box:e=>({x:e.x-18,y:e.y-46,w:36,h:46}),
     make(e){
@@ -447,7 +447,16 @@ const CaveBossArt6 = (() => {
     G.eb=G.eb.filter(b=>b.k!=='clockfangGear'&&b.k!=='clockfangSpark');
     note('sine',196,.62,.12);note('triangle',392,.30,.07,.05);
   }
-  count.hp=118;
+  // Audit 2026-11: 118 fell in ~11 s, a third of the Roost Matriarch's fight. 300 lets every attack and the
+  // last chime play out (~20 s for the test bot; above ~320 one death in the fight snowballs); two heart drops keep it fair.
+  count.hp=300;
+  const heartAt=[2/3,1/3];
+  function bossHeart(e){
+    while((e.hearts|0)<heartAt.length&&e.hp<=e.max*heartAt[e.hearts|0]){
+      e.hearts=(e.hearts|0)+1;
+      dropItem('heart',clamp(G.p.x+G.p.facing*14,G.cam.x+15,G.cam.x+W-15),groundAt(G.p.x)-19,0);
+    }
+  }
   count.box=e=>({x:e.x-24,y:e.y-101,w:48,h:101});
   count.update=function(e){
     if(!e.chimeUsed && !e.dying && !e.inv && e.enraged && e.hp<=e.max/3 && !G.p.dead &&

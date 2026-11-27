@@ -1250,7 +1250,8 @@ const L7Foes = (() => {
   // marked bank crosses overhead before diving, leaving an opening afterwards.
   // Half health adds two fixed lightning lanes with a gap between them.
   ENEMY_TYPES.stormManta = {
-    hp:76,boss:true,bossName:'THE STORM MANTA',armored:true,
+    // Audit 2026-11: 76 fell in ~15 s; 180 lets the fan, bank, fork and harness phases all play out.
+    hp:180,boss:true,bossName:'THE STORM MANTA',armored:true,
     contact:'none',
     box:e=>({x:e.x-25,y:e.y-55,w:50,h:49}),
     make(e){bossIntro(e,80,107,106);},
@@ -1274,6 +1275,7 @@ const L7Foes = (() => {
         if(e.clasps.every(c=>c.dead)){
           refract(e,e.clasps.map(c=>c.x));
           G.texts.push({x:e.x,y:e.y-66,s:'HARNESS BROKEN!',c:cyan,t:84});
+          dropItem('heart',clamp(G.p.x+G.p.facing*14,G.cam.x+15,G.cam.x+W-15),groundAt(G.p.x)-19,0);
         }
         return;
       }
