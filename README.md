@@ -1,6 +1,6 @@
 # Robot Rumble
 
-A side-scrolling run-and-gun canvas game made for two kids, seven missions long.
+A side-scrolling run-and-gun canvas game made for two kids, eight missions long.
 
 - **Play:** https://gunnit.github.io/robot-rumble/ (or double-click `index.html`)
 - **Controls:** shown on the title screen

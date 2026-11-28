@@ -18,12 +18,14 @@ A side-scrolling run-and-gun HTML5 canvas game (480x270) a parent is making for 
 | 5 | ALIEN MOTHERSHIP | `src/level5*.js`, spec `docs/level5-spec.md`, notes `tools/m5/` |
 | 6 | CLOCKFANG CAVERN | `src/level6*.js` |
 | 7 | THE LAST LIGHTHOUSE | `src/level7*.js` |
+| 8 | DINOSAUR VALLEY | `src/level8*.js`, design `docs/superpowers/specs/2026-11-27-mission8-dinosaur-valley-design.md`, notes `tools/m8/` |
 
 Engine API for mission authors: `docs/engine-api.md`.
 
-Story across missions (THE OGGLE CASE FILE): `src/story.js` (briefings, clues, Case File, ending, dinosaur
-epilogue); notes and its test in `tools/audit/` (`node tools/audit/story-test.mjs`). A new mission needs a
-`BRIEF` entry and a clue there.
+Story across missions (THE OGGLE CASE FILE): `src/story.js` (briefings, a clue per boss, the Case File, the bridge
+card after Mission 7, the ending after Mission 8 and CASE CLOSED once all eight clues are found; the two last
+pictures are Mission 8's, `src/level8_story.js`); notes and its test in `tools/audit/`
+(`node tools/audit/story-test.mjs`). A new mission needs a `BRIEF` entry and a clue there.
 
 ## Where things live
 

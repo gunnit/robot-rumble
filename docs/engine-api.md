@@ -130,7 +130,7 @@ worked example for nearly everything).
 | `G.markers.push({ x, t })` | Mission 1 target marker; a missile drops on it at `t = 50` |
 | `G.shake`, `G.sflash` | screen shake (px, decays) / white screen flash (0..0.6) |
 | `makeEnemy(spec, lock)` | create an enemy, then push it to `G.enemies` (e.g. a boss calling wolves: `const w = makeEnemy({ t: 'wolf', x }); w.active = true; G.enemies.push(w);`). An unknown type gives a dead stand-in plus one warning, so this never crashes; the stand-in is dropped on the next update |
-| `damageEnemy(e, dmg)` → bool | damage (ignored while `e.inv`, `e.dying` or `e.state === 'dying'`); kills at 0 hp |
+| `damageEnemy(e, dmg)` → bool | damage (ignored while `e.inv`, `e.dying` or `e.state === 'dying'`; a type's `shield(e, dmg)` may cut it down or turn it away); kills at 0 hp |
 | `hurtPlayer()` | one hit on the hero (or its ride); does nothing while invulnerable, in god mode, during an intro or after the boss is beaten (`G.winT > 0`) |
 | `bossDefeated(e)` | end of the **final** boss's death animation: removes it and **ends the mission** (win screen 210 frames later). A mini-boss sets `e.dead = true` instead |
 | `land(e, prevY)` | gravity landing for anything with `x, y, vy, onGround, onPlat`: terrain + one-way platforms, sticks to the ground going downhill |
@@ -179,7 +179,7 @@ kind (removed before it can hurt) or music track that doesn't exist yet is skipp
 `console.warn` per name (the harness lists them under `warnings`).
 
 ### ENEMY_TYPES
-`ENEMY_TYPES[name] = { hp, boss?, bossName?, flying?, activateMargin?, edge?, armored?, melee?, contact?, make?(e, spec), update(e), draw(e), box(e), onKill?(e, cx, cy, box) }`
+`ENEMY_TYPES[name] = { hp, boss?, bossName?, flying?, activateMargin?, edge?, armored?, melee?, contact?, make?(e, spec), update(e), draw(e), box(e), shield?(e, dmg), onKill?(e, cx, cy, box) }`
 
 - Every enemy `e` has `type, x, y (feet), vx, vy, t, hitT, facing (-1), active, dead, lock, hp, max`
   plus whatever `make` adds. `e.state === 'intro'` or `'dying'` (or `e.dying`, see `onKill`) switches
@@ -192,6 +192,10 @@ kind (removed before it can hurt) or music track that doesn't exist yet is skipp
   `flying` = the bot aims up at it. `activateMargin` (default 30): spawned enemies wake up when
   this close to the right screen edge. `edge` (default 16): wave enemies appear this far outside
   the screen. `armored` = clank sound on hits. `melee` = the hero knifes it at close range.
+- `shield(e, dmg)` → the damage that gets through (optional; asked by `damageEnemy` before every hit, whatever dealt
+  it). `0` or less turns the hit away: no hp lost, no hit flash, no sound (play your own), `damageEnemy` returns
+  `false`. More than `dmg` is allowed (a weak moment). Mission 8's CLUBTAIL uses it: only 10 hit points get through
+  per attack of hers, and hits count double while she is dizzy.
 - `contact`: `'hurt'` (default), `'block'` (pushes the hero, or the ride's box by its edges, back out;
   harmless; the push never takes the hero past the screen edges, `G.cam.x + 8` to `G.cam.x + W - 8` like the
   camera, so a block enemy walking into a locked screen can't hide the hero), `'none'`, or a function
@@ -596,8 +600,8 @@ field provides the boarding hint. The mission selector windows three cards when 
 Verification: `node tools/mission4/test.mjs controls`;
 `node tools/mission4/sim.mjs 0 1 swim`; `node tools/mission4/sim.mjs 1 2 sub`.
 `RR_HTML=/absolute/path/index.html` runs these tests against a standalone bundle.
-The generic engine stand-in is the mission after the last real one. With six campaign missions, run
-`node tools/harness/harness.mjs sim --level 7 --extra tools/harness/fixtures/engine-selftest.js`.
+The generic engine stand-in is the mission after the last real one. With eight campaign missions, run
+`node tools/harness/harness.mjs sim --level 9 --extra tools/harness/fixtures/engine-selftest.js`.
 
 
 ## Mission 5: Alien Mothership (2026-11-16)
@@ -621,3 +625,42 @@ Verification: `node tools/harness/harness.mjs sim --level 5 --seed 1`; rule test
 `... sim --level 5 --seed 1 --frames 1 --extra tools/m5/build/skeleton/t-rules.js` (62 checks); the tuning log
 `sh tools/m5/build/coord/batch.sh "1 2 3 4 5 6 7 8 9 10 11 12"` (never-dodging bot, 2026-11-16: 11.9 hits on average,
 per area 3.4 / 1.9 / 2.8 / 3.8, about 198 s); parity of Missions 1-4 against `tools/m5/build/baseline-lN.json`.
+
+
+## Mission 8: Dinosaur Valley (2026-11-28)
+
+Design, as built: `docs/superpowers/specs/2026-11-27-mission8-dinosaur-valley-design.md`. Build notes, the three test
+players and the reference numbers: `tools/m8/notes.md`. Fourteen files load after `level7.js`: `level8_kit.js`,
+`level8_cast.js`, `level8_friends.js`, `level8_giants.js`, `level8_enemies.js`, `level8_gear.js`, `level8_bosses.js`,
+`level8.js`, `level8_chase.js`, `level8_backdrops.js`, `level8_scenery.js`, `level8_music.js`, `level8_story.js`,
+`level8_intro.js`. The header comment of each file is the reference for what it does.
+New top-level names (never declare them elsewhere): `M8` (the looks: the private pixel kit `M8.px`, the palettes and
+one painter per character: `compy`, `raptor`, `ptero`, `spitter`, `tops`, `clubtail`, `rex`, `hatchling`, `ring`,
+`bang`, `burst`, ...), `L8` (the rules and the level's joiners: `level`, `poolAt`, `sticky`, `cageOpen`, `robotDown`,
+`scram`, `chase`, `rexKeep`, the draw hooks, `storyArt`, ...). Everything else is private to its file's block.
+Registry names it adds: enemies `compy raptor ptero spitter robonest boulderwall clubtail ogglerex rexeye`; props
+`amber tops topscage topsrun topswait rexwreck`; POW kind `hatchling`; ride `tops`; weapon `dinorang` with item `D`;
+projectiles `dinoegg spitgoo tailspike rexrock` (its ground waves are the engine's built-in `wave`); tracks
+`dinovalley dinochase clubtail ogglerex dinodawn`.
+The engine gained one hook for it, `ENEMY_TYPES[type].shield(e, dmg)` (section 4; CLUBTAIL's armour). Mission 8 also
+wraps three hooks of Mission 5's `oggle` (`onKill`, `update`, `contact`): in any other level they behave as before.
+Level rules, none of them in the engine: wading (water 65 % of the hero's speed, tar 45 %); the hearts rule (a robot
+beaten while the hero is on his last heart leaves one, at most every 20 s); CLUBTAIL's lock is a checkpoint of its
+own (`L8.CLUB_AT`, and `L8.CLUB_AT + 1` once she is beaten); a giant's arena holds the giant and nothing else
+(`L8.scram`: at WARNING every small robot that is not part of that lock runs or flies off); a bomber flies home after
+its third pass, so no lock waits for it; the chase's Rex is a level object, not an enemy (`L8.chase`); the OGGLE REX
+comes back after a continue with the health it had, at most 75 % (`L8.rexKeep`); the scenery is painted ahead a
+little at a time, on the mission card, in the briefing, in the opening scene and every fourth frame of play
+(`L8.sceneWarm`, `L8.bakeSome(ms)`; `M8.queued()` says how many pictures still wait).
+The story's last two pictures and the eighth clue are wired in `src/story.js` (pictures: `level8_story.js`).
+
+Verification: `node tools/harness/harness.mjs sim --level 8 --seed 1 --hero 1`; the three never-dodging test players
+(add `--extra tools/m8/jitter.js`, and `--extra tools/m8/steady.js` or `--extra tools/m8/runner.js`); who hits the
+bot where and how long each lock lasts (`--extra tools/m8/trace.js`, read stderr); `node tools/m8/music-check.mjs`;
+the campaign flow (`... sim --level 1 --frames 1 --extra tools/harness/fixtures/flow-selftest.js`, 42 checks) and the
+story (`node tools/audit/story-test.mjs`). What the test players never do, played on purpose in the real game (every
+attack and its escape, the giants' arenas, the chase, TOPS, every checkpoint):
+`RR_GAME=$PWD node tools/m8/paths-test.mjs`. A real browser with sound against the test rig's run:
+`node tools/m8/browser-check.mjs`. The harness extras behind them (`audio-check.js`: strict sound calls;
+`paint-apart.js`: painting cannot change a run; `keys-rec.js`: a run's keys for a replay; `coverage.mjs`: which lines
+no test ran) are described in their headers. Parity of Missions 1 to 7 and the measured numbers: `tools/m8/notes.md`.
