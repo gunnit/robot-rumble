@@ -1,7 +1,8 @@
 # Mission 8 (DINOSAUR VALLEY): build notes
 
-STATUS: [2026-11-28] BUILT and verified on branch `dino-mission-8`, stacked on `mission-audit-story` (PR 1). A draft PR
-is open against that branch; nothing is on `main` (so nothing is live). Waits for the owner's review and play test.
+STATUS: [2026-11-28] BUILT and verified on branch `dino-mission-8`, stacked on `mission-audit-story` (PR 1). Draft PR 2
+(https://github.com/gunnit/robot-rumble/pull/2) is open against that branch; nothing is on `main` (so nothing is live).
+Waits for the owner's review and play test. To merge: PR 1 first, then point PR 2 at `main`.
 To resume: read "Open points" at the end; everything above it is done and measured on the code as committed.
 
 Request (owner, 2026-11-27): "build the dinosaur mission making it amazingly good". Taken as the go-ahead to build,
