@@ -1,5 +1,5 @@
 // Mission flow check (title, mission select, hero select, checkpoints, continue, next mission, intro,
-// all clear) on the real six-mission campaign. Runs at load time and prints FLOW lines:
+// all clear) on the real eight-mission campaign. Runs at load time and prints FLOW lines:
 //   node harness.mjs sim --level 1 --frames 1 --extra fixtures/flow-selftest.js 2>&1 | grep FLOW
 // (Before Mission 2 existed this ran with engine-selftest.js as a stand-in mission 2; with the real Mission 2 loaded
 // that stand-in would be a third mission, so the check now runs without it.)
@@ -8,7 +8,7 @@
   const step = (n, key) => { for (let i = 0; i < n; i++) { if (key && i === 0) pressed[key] = true; update(); for (const k in pressed) delete pressed[k]; } };
   const last = LEVELS.length - 1;
   if (typeof STORY !== 'undefined') STORY.enabled = false; // this checks the engine flow; tools/audit/story-test.mjs checks the story
-  ok(LEVELS.length === 7 && LEVELS[6].title === 'THE LAST LIGHTHOUSE' && LEVELS[5].title === 'CLOCKFANG CAVERN' && LEVELS[4].title === 'ALIEN MOTHERSHIP' && LEVELS[1].title === 'VIGO HILLS' && LEVELS[2].title === 'VOLCANO ISLAND' && LEVELS[3].title === 'CORAL KINGDOM', 'missions loaded: ' + LEVELS.map(l => l.title).join(', '));
+  ok(LEVELS.length === 8 && LEVELS[7].title === 'DINOSAUR VALLEY' && LEVELS[6].title === 'THE LAST LIGHTHOUSE' && LEVELS[5].title === 'CLOCKFANG CAVERN' && LEVELS[4].title === 'ALIEN MOTHERSHIP' && LEVELS[1].title === 'VIGO HILLS' && LEVELS[2].title === 'VOLCANO ISLAND' && LEVELS[3].title === 'CORAL KINGDOM', 'missions loaded: ' + LEVELS.map(l => l.title).join(', '));
   // title -> missions -> select -> play
   G.state = 'title'; step(1, 'Enter'); ok(G.state === 'missions', 'title -> missions (' + G.state + ')');
   step(1, 'ArrowRight'); ok(G.level === 1, 'right selects mission 2 (' + G.level + ')');
@@ -80,6 +80,18 @@
   ok(!G.intro && !G.p.hidden && G.p.x === LV.heroStart, 'lighthouse intro hands over at Saltwind Quay');
   G.checkpoint = 3350; G.state = 'over'; G.overT = 500; step(1, 'Enter'); step(1);
   ok(G.p.ride && G.p.ride.type === 'kitePost7' && G.continues === 1, 'lighthouse continue boards the mail skiff');
+  // Mission 8: the opening scene plays itself out (the hero ducks and shoots the little robot), then the two
+  // checkpoints of CLUBTAIL's arena: during the fight (her cage shut), after it (TOPS waits for the hero)
+  toWin(); step(130); step(1, 'Enter');
+  ok(G.state === 'play' && G.level === 7 && LV === LEVELS[7] && G.hero === 1 && G.score === carriedScore && G.lives === 3 && !G.p.ride, 'mission 7 win -> mission 8 with hero and score, on foot');
+  ok(G.intro === true && G.big === null, 'mission 8 intro running, no MISSION START banner yet');
+  let n8 = 0, banner8 = false, ducked = false, shots = 0;
+  while (G.intro && n8 < 800) { step(1); n8++; if (G.p.crouch) ducked = true; shots = Math.max(shots, G.pb.length); if (G.big && /MISSION 8 START/.test(G.big.s)) banner8 = true; }
+  ok(G.intro === false && banner8 && ducked && shots === 1 && G.pb.length === 0 && !G.p.crouch && !G.enemies.some(e => e.active), 'mission 8 intro hands over control after ' + n8 + ' frames: one shot from a duck, no robot left, MISSION 8 START! shown');
+  G.checkpoint = L8.CLUB_AT; G.state = 'over'; G.overT = 500; step(1, 'Enter');
+  ok(LV === LEVELS[7] && G.cam.x === L8.CLUB_AT && !G.intro && G.section === 2 && G.props.some(o => o.k === 'topscage') && !L8.cageOpen(), 'continue in CLUBTAIL\'s arena: area 3, the cage shut (cam ' + G.cam.x + ')');
+  G.checkpoint = L8.CLUB_AT + 1; G.state = 'over'; G.overT = 500; step(1, 'Enter');
+  ok(G.cam.x === L8.CLUB_AT + 1 && L8.cageOpen() && !G.props.some(o => o.k === 'topscage') && G.props.some(o => o.k === 'tops'), 'continue after CLUBTAIL: no cage, TOPS waits for the hero');
   // last mission -> all clear -> title
   toWin(); step(130); step(1, 'Enter'); ok(G.state === 'allclear', 'last win -> ALL MISSIONS COMPLETE (' + G.state + ')');
   step(10, 'Enter'); ok(G.state === 'allclear', 'all clear waits before Enter works');

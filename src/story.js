@@ -1,17 +1,20 @@
 'use strict';
 // ============================================================
-// Story: THE OGGLE CASE FILE (audit 2026-11).
-// One thread through all seven missions: the green one-eyed Oggles (Mission 5) built every boss. Each boss leaves a
+// Story: THE OGGLE CASE FILE (audit 2026-11; Mission 8 closes it).
+// One thread through all eight missions: the green one-eyed Oggles (Mission 5) built every boss. Each boss leaves a
 // clue; a briefing card before each mission picks up where the last clue left off; the Case File on the mission
-// select fills in as bosses fall (it reads the saved stars, so nothing new is stored). After the last mission an
-// ending card plays, and with all seven clues the dinosaur epilogue (the teaser for a future Mission 8).
+// select fills in as bosses fall (it reads the saved stars, so nothing new is stored).
+// After Mission 7 the pod tracker's trail plays (the night valley, a dinosaur with a green robot eye) and leads into
+// Mission 8's briefing. After Mission 8 the ending card plays (morning in the valley: level8_story.js paints it),
+// then ALL MISSIONS COMPLETE, and with all eight clues CASE CLOSED.
 // Loads after screens.js and before main.js: it wraps update, draw and startMission and changes nothing else.
 // The briefing only follows startMission (menus, the win screen): devStart and the harness never see it.
 // Global: STORY only.
 // ============================================================
 const STORY = (() => {
   const GOLD = '#ffe066', MINT = '#8be0a8', PAPER = '#f4e2b8', DIM = '#8a93b0', GREEN = '#9dff4a';
-  const CLUES = ['GREEN-EYE CHIP', 'STAR MAP SCRAP', 'SHIPPING TAG', 'LAUNCH PLAN', "CAPTAIN'S LOG", 'STORM KEY', 'POD TRACKER'];
+  const CLUES = ['GREEN-EYE CHIP', 'STAR MAP SCRAP', 'SHIPPING TAG', 'LAUNCH PLAN', "CAPTAIN'S LOG", 'STORM KEY', 'POD TRACKER', 'MASTER SWITCH'];
+  const FINAL = CLUES.length - 1;   // the story's last mission (DINOSAUR VALLEY): its win ends the case
   // Briefing before mission i: the clue it follows (none for Mission 1), then three short lines
   const BRIEF = [
     ['ROBOTS ARE TAKING PRISONERS IN THE JUNGLE.', 'NOBODY KNOWS WHO BUILT THEM.', 'STOP THEM AND FIND OUT!'],
@@ -20,14 +23,18 @@ const STORY = (() => {
     ['THE TAG SAYS: DELIVER TO THE DEEP.', 'THE ROBOT PARTS ARE GOING UNDER THE SEA.', 'DIVE IN AND FOLLOW THEM!'],
     ['THE PLAN SAYS: PICK-UP TONIGHT, VIGO HILLS.', 'SOMETHING IS COMING FROM THE SKY...', "IT'S THE OGGLES! THEY BUILT EVERY ROBOT!"],
     ['MEGA OGGLE GOT AWAY IN AN ESCAPE POD!', 'HIS SHIP DROPPED ITS ENGINE INTO A MOUNTAIN CAVE.', 'COUNT CLOCKFANG FOUND IT FIRST.'],
-    ['CLOCKFANG GAVE THE OGGLES A STORM KEY.', 'NOW THE STORM MANTA HIDES THE WHOLE COAST.', 'LIGHT THE LIGHTHOUSE. BRING THE SHIPS HOME!']
+    ['CLOCKFANG GAVE THE OGGLES A STORM KEY.', 'NOW THE STORM MANTA HIDES THE WHOLE COAST.', 'LIGHT THE LIGHTHOUSE. BRING THE SHIPS HOME!'],
+    ['THE TRACKER FOUND THE POD IN A VALLEY OF DINOSAURS!', 'MEGA OGGLE CAGED THE BABIES TO BUILD ROBOT COPIES.', 'FREE THEM AND SWITCH HIM OFF FOR GOOD!']
   ];
-  const ENDING = ['THE LIGHT IS BACK. EVERY SHIP IS HOME.', 'BUT THE STORM MANTA HAD A POD TRACKER INSIDE...', 'IT IS BEEPING. SOMETHING FAR AWAY IS ANSWERING.'];
-  const EPILOGUE = ["MEGA OGGLE'S ESCAPE POD LANDED IN A HIDDEN VALLEY.", 'THE OGGLES ARE WAKING UP THE DINOSAURS!', 'TO BE CONTINUED...'];
+  // one line at a time (Enter: the next one): the trail after Mission 7, and CASE CLOSED after all eight clues
+  const BRIDGE = ['THE POD TRACKER LEADS TO A HIDDEN VALLEY.', 'MEGA OGGLE IS THERE, BUILDING ROBOT DINOSAURS!', 'ONE LAST MISSION: DINOSAUR VALLEY!'];
+  const EPILOGUE = ['ALL 8 CLUES FOUND! THE OGGLE CASE FILE IS CLOSED.', 'MEGA OGGLE HAS A NEW JOB: DINOSAUR BABYSITTER!', 'THE END. WELL DONE, ' + HEROES.map(h => h.name).join(' AND ') + '!'];
+  // typed into the box after Mission 8
+  const ENDING = ['THE MASTER SWITCH IS OFF!', 'EVERY OGGLE ROBOT IN THE WORLD FALLS ASLEEP.', 'THE DINOSAURS HAVE THEIR VALLEY BACK!'];
 
   let on = true;      // STORY.enabled = false: the old flow, for the engine's own flow tests
   let brief = null;   // { i, t }: the briefing before mission i, shown over a paused mission start
-  let card = null;    // { mode: 'ending' | 'epilogue', t } while G.state === 'story'
+  let card = null;    // { mode: 'bridge' | 'ending' | 'epilogue', t } while G.state === 'story'
 
   const found = i => !!(G.rec && G.rec[i] && G.rec[i].stars > 0);
   const count = () => { let n = 0; for (let i = 0; i < CLUES.length; i++) if (found(i)) n++; return n; };
@@ -71,6 +78,11 @@ const STORY = (() => {
         RO(x + 2, y + 3, 10, 10, '#56606e'); R(x + 3, y + 4, 8, 1, '#8a97a8');
         R(x + 4, y + 7, 6, 4, '#16222a'); R(x + 5, y + 8, 4, 2, blink(12) ? GREEN : '#2e5a2e');
         R(x + 9, y, 1, 3, '#c3cdd8'); R(x + 8, y, 3, 1, '#c3cdd8');
+        break;
+      case 7: // the Master Switch: a hazard box with one big red lever
+        R(x + 6, y + 3, 2, 4, '#a3151a'); RO(x + 5, y + 1, 4, 3, '#ff3b30'); R(x + 5, y + 1, 1, 1, '#ffd6d1');
+        RO(x + 1, y + 7, 12, 6, '#56606e'); R(x + 1, y + 7, 12, 1, '#c3cdd8');
+        for (let k = 0; k < 4; k++) R(x + 2 + k * 3, y + 10, 2, 2, k % 2 ? '#1a1826' : '#ffc83a');
         break;
     }
   }
@@ -134,25 +146,36 @@ const STORY = (() => {
     prompt(lines, t, 'ENTER: GO!');
   }
 
-  // ---- after the last mission ----
+  // ---- one line at a time, under a picture that fills the screen ----
+  const SLIDE = 210;                                   // frames a line stays before the next comes by itself
+  const slideAt = (lines, t) => Math.min(lines.length - 1, Math.floor(Math.max(0, t - 24) / SLIDE));
+  const slideStart = k => 24 + k * SLIDE;
+  function slides(lines, t) {
+    R(18, 222, W - 36, 22, 'rgba(8,10,20,0.75)');
+    const k = slideAt(lines, t), last = k === lines.length - 1;
+    text(lines[k], W / 2, 229, last ? GOLD : '#e8ecff', 1, 'center');
+    if (last ? blink(25) : t - slideStart(k) > 60 && blink(25)) text(last ? 'PRESS ENTER' : 'ENTER: NEXT', W / 2, H - 16, last ? GOLD : DIM, 1, 'center', null);
+  }
+  // Mission 8 paints the valley for the last two cards (level8_story.js); without it only the backdrop shows
+  function valley(mode, t) {
+    if (typeof L8 === 'undefined' || !L8.storyArt) return;
+    ctx.save();
+    try { L8.storyArt(mode, t); } catch (err) { errorOnce(err); } finally { ctx.restore(); }
+  }
+
+  // ---- after the last mission (DINOSAUR VALLEY): the next morning ----
   function drawEnding() {
     const t = card.t;
     screenBG('#1b2a3e', '#0a1018');
-    bands('INCOMING TRANSMISSION', 'CASE FILE ' + count() + ' / ' + CLUES.length);
-    // the lighthouse, lit, with five ship lights answering
-    R(0, 150, W, 70, '#14324a'); for (let x = 0; x < W; x += 24) R(x + ((G.t >> 3) % 24), 160 + (x % 5), 10, 1, '#2b5878');
-    RO(226, 70, 28, 80, '#e8e2d2'); R(226, 90, 28, 8, '#c0392b'); R(226, 118, 28, 8, '#c0392b'); RO(222, 58, 36, 14, '#3a4250');
-    R(230, 61, 20, 8, '#fff2a8');
-    ctx.fillStyle = 'rgba(255,240,170,0.13)'; ctx.beginPath(); ctx.moveTo(240, 65);
-    const sw = Math.sin(G.t * 0.02) * 120; ctx.lineTo(sw < 0 ? 0 : W, 30 + Math.abs(sw) * 0.2); ctx.lineTo(sw < 0 ? 0 : W, 100 + Math.abs(sw) * 0.2); ctx.closePath(); ctx.fill();
-    for (let k = 0; k < 5; k++) { const sx = 40 + k * 95 + (k === 2 ? 20 : 0); RO(sx, 176 - (k % 2) * 6, 22, 5, '#2a2f3a'); R(sx + 9, 168 - (k % 2) * 6, 2, 8, '#2a2f3a'); if ((G.t + k * 20) % 80 < 50) R(sx + 9, 166 - (k % 2) * 6, 2, 2, '#fff2a8'); }
-    clueIcon(6, 300, 120, true); text(CLUES[6], 318, 124, PAPER, 1, 'left');
+    valley('ending', t);
+    bands('MISSION REPORT', 'CASE FILE ' + count() + ' / ' + CLUES.length);
+    R(22, 27, 104, 20, 'rgba(8,10,20,0.62)'); clueIcon(FINAL, 26, 30, true); text(CLUES[FINAL], 44, 34, PAPER, 1, 'left');
     panel(18, 190, W - 36, 50);
     typed(ENDING, t, W / 2, 196, 15, '#e8ecff');
     prompt(ENDING, t, 'PRESS ENTER');
   }
 
-  // ---- the dinosaur epilogue (all seven clues) ----
+  // ---- after Mission 7: the pod tracker's trail (the night valley; it leads into Mission 8's briefing) ----
   function dino(x, y, t, c = '#0a1611', eye = true) {
     // a big two-legged dinosaur in silhouette, facing left; its robot eye glows green
     const bob = Math.round(Math.sin(t * 0.05) * 1.5);
@@ -173,7 +196,7 @@ const STORY = (() => {
     if (on) { ctx.fillStyle = 'rgba(157,255,74,' + (0.18 + 0.08 * Math.sin(t * 0.2)) + ')'; circ(ex + 2, ey + 1, 9); }
     R(ex, ey, 4, 3, on ? GREEN : '#1e3a2a'); if (on) R(ex + 1, ey + 1, 2, 1, '#eaffd0');
   }
-  function drawEpilogue() {
+  function drawBridge() {
     const t = card.t, shake = t > 110 && t < 150 ? Math.round(Math.sin(t) * 2) : 0;
     ctx.save(); ctx.translate(shake, 0);
     screenBG('#0b1430', '#1c3226');
@@ -197,12 +220,28 @@ const STORY = (() => {
     if (t > 110 && t < 170) text('ROAR!', 250 + dx, 86, GREEN, 2, 'center');
     ctx.restore();
     bands('THE OGGLE CASE FILE', 'SOMEWHERE FAR AWAY...');
-    R(18, 222, W - 36, 22, 'rgba(8,10,20,0.75)');
-    const lines = EPILOGUE, k = Math.min(lines.length - 1, Math.floor(Math.max(0, t - 24) / 90));
-    text(lines[k], W / 2, 229, k === lines.length - 1 ? GOLD : '#e8ecff', 1, 'center');
-    if (t > 24 + 90 * (lines.length - 1) && blink(25)) text('PRESS ENTER', W / 2, H - 16, GOLD, 1, 'center', null);
+    slides(BRIDGE, t);
   }
-  const epilogueDone = t => t > 24 + 90 * (EPILOGUE.length - 1);
+
+  // ---- CASE CLOSED (all eight clues): the full file, the stamp, and Mega Oggle's new job ----
+  function drawEpilogue() {
+    const t = card.t, RED = '#d23a2a';
+    screenBG('#1b2a3e', '#0a1018');
+    valley('epilogue', t);
+    bands('THE OGGLE CASE FILE', 'CASE FILE ' + count() + ' / ' + CLUES.length);
+    const w = CLUES.length * 17 - 3, x = Math.round(W / 2 - w / 2);
+    R(x - 6, 27, w + 12, 20, 'rgba(8,10,20,0.72)');
+    for (let i = 0; i < CLUES.length; i++) clueIcon(i, x + i * 17, 30, true);
+    if (t > 40) {                                       // the stamp comes down big and settles
+      const k = Math.min(1, (t - 40) / 8), sc = 2 - k, sw = 142, sh = 22;
+      ctx.save(); ctx.translate(W / 2, 64); ctx.scale(sc, sc);
+      R(-sw / 2, -sh / 2, sw, sh, 'rgba(255,244,228,0.94)');
+      R(-sw / 2, -sh / 2, sw, 2, RED); R(-sw / 2, sh / 2 - 2, sw, 2, RED); R(-sw / 2, -sh / 2, 2, sh, RED); R(sw / 2 - 2, -sh / 2, 2, sh, RED);
+      text('CASE CLOSED', 0, -7, RED, 2, 'center', null);
+      ctx.restore();
+    }
+    slides(EPILOGUE, t);
+  }
 
   // ---- hooks ----
   const baseUpdate = update, baseDraw = window.draw, baseStartMission = startMission;
@@ -216,9 +255,13 @@ const STORY = (() => {
   update = function () {
     if (G.state === 'story' && card) {
       idle(); card.t++;
-      const ready = card.mode === 'epilogue' ? epilogueDone(card.t) : done(ENDING, card.t);
+      if (card.mode === 'epilogue' && card.t === 44) { Snd.noise(0.18, 0.4, 700); Snd.tone('sine', 120, 50, 0.2, 0.3); }   // the stamp
+      const lines = card.mode === 'bridge' ? BRIDGE : card.mode === 'epilogue' ? EPILOGUE : null;
       if (tap('ok') && card.t > 20) {
-        if (!ready) card.t = 1e4;   // Enter first shows the whole message
+        const k = lines ? slideAt(lines, card.t) : 0;
+        if (lines && k < lines.length - 1) { card.t = slideStart(k + 1); Snd.select(); }   // Enter: the next line
+        else if (lines ? card.t < slideStart(k) + 20 : !done(ENDING, card.t)) { if (!lines) card.t = 1e4; }   // typed card: Enter first shows the whole message
+        else if (card.mode === 'bridge') { card = null; startMission(FINAL); }
         else if (card.mode === 'ending') {
           card = null; G.state = 'allclear'; G.endT = 0; G.fw = []; G.fade = 1; Snd.win(); say('All missions complete!');
         } else { card = null; G.state = 'title'; G.level = 0; G.fade = 1; Music.stop(); }
@@ -234,20 +277,29 @@ const STORY = (() => {
       return;
     }
     if (G.state !== 'play') brief = null;
-    // the last mission's win: the ending card comes before ALL MISSIONS COMPLETE
-    if (on && G.state === 'win' && G.endT > 120 && tap('ok') && LEVELS.length > 1 && G.level + 1 >= LEVELS.length) {
-      fireworks(22); card = { mode: 'ending', t: 0 }; G.state = 'story'; G.fade = 1; Snd.select(); return;
+    const won = on && G.state === 'win' && G.endT > 120 && LEVELS[G.level] === LV && tap('ok');
+    // Mission 7's win: the tracker's trail comes before Mission 8
+    if (won && G.level === FINAL - 1 && LEVELS[FINAL]) {
+      card = { mode: 'bridge', t: 0 }; G.state = 'story'; G.fade = 1; Music.stop(); Snd.tone('sawtooth', 70, 40, 1.2, 0.12); return;
     }
-    // ALL MISSIONS COMPLETE with every clue found: the dinosaur epilogue before the title
+    // the last mission's win: the ending card comes before ALL MISSIONS COMPLETE
+    if (won && G.level === FINAL && G.level + 1 >= LEVELS.length) {
+      fireworks(22); card = { mode: 'ending', t: 0 }; G.state = 'story'; G.fade = 1; Snd.select();
+      if (TRACKS.dinodawn) Music.play('dinodawn');
+      return;
+    }
+    // ALL MISSIONS COMPLETE with every clue found: CASE CLOSED before the title
     if (on && G.state === 'allclear' && G.endT > 120 && tap('ok') && full()) {
-      card = { mode: 'epilogue', t: 0 }; G.state = 'story'; G.fade = 1; Music.stop(); Snd.tone('sawtooth', 70, 40, 1.2, 0.12); return;
+      card = { mode: 'epilogue', t: 0 }; G.state = 'story'; G.fade = 1; Snd.select();
+      if (TRACKS.dinodawn) Music.play('dinodawn'); else Music.stop();
+      return;
     }
     baseUpdate();
   };
 
   window.draw = function () {
     if (G.state === 'story' && card) {
-      if (card.mode === 'ending') drawEnding(); else drawEpilogue();
+      if (card.mode === 'ending') drawEnding(); else if (card.mode === 'bridge') drawBridge(); else drawEpilogue();
       if (G.fade > 0) { ctx.fillStyle = 'rgba(0,0,0,' + G.fade.toFixed(2) + ')'; ctx.fillRect(0, 0, W, H); }
       return;
     }
@@ -272,7 +324,7 @@ const STORY = (() => {
         text('CASE FILE ' + count() + ' / ' + CLUES.length, 376, 179, DIM, 1, 'left', null);
       } else if (G.state === 'allclear' && !full() && G.endT > 60) {
         R(0, 236, W, 11, 'rgba(10,10,30,0.7)');
-        text('FIND ALL 7 CLUES TO SEE WHERE MEGA OGGLE WENT!', W / 2, 238, MINT, 1, 'center');
+        text('FIND ALL ' + CLUES.length + ' CLUES TO CLOSE THE CASE FILE!', W / 2, 238, MINT, 1, 'center');
       }
     } catch (err) { errorOnce(err); }
   };

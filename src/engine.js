@@ -350,6 +350,9 @@ const offStage = e => e.dying || e.state === 'dying' || e.state === 'intro';
 
 function damageEnemy(e, d) {
   if (e.dead || e.inv || e.dying || e.state === 'dying') return false;
+  // a type's own armour: shield(e, d) returns the damage that gets through (0 or less: the hit is turned away)
+  const shield = ENEMY_TYPES[e.type].shield;
+  if (shield) { d = shield(e, d); if (!(d > 0)) return false; }
   e.hp -= d; e.hitT = 4;
   if (e.hp <= 0) killEnemy(e);
   else if (ENEMY_TYPES[e.type].armored) Snd.clank();

@@ -137,14 +137,15 @@ unchanged. The bot frees 5-7 of Mission 1's 7 prisoners (it jumps over one now a
 hook Mission 1 doesn't: terrain, an intro, a ride, bullet hooks, a custom projectile, a boss death
 animation, POW kinds and names nobody had built yet. Failures show up as `SELFTEST FAIL` warnings; a clean
 run ends with the warning `SELFTEST DONE: boarded=true woof=true loads=1`. The fixture registers
-immediately after the seven campaign missions.
+immediately after the eight campaign missions.
 
 ```sh
-node $H/harness.mjs sim --level 8 --seed 1 --extra $H/fixtures/engine-selftest.js
+node $H/harness.mjs sim --level 9 --seed 1 --extra $H/fixtures/engine-selftest.js
 ```
 
 The campaign flow checks cover mission and hero selection, score carryover, intro handoffs,
-checkpoint continues, Mission 6's starting bow, Mission 7's lamp gun and skiff checkpoint, and the return to the title after the final win.
+checkpoint continues, Mission 6's starting bow, Mission 7's lamp gun and skiff checkpoint, Mission 8's opening scene and
+the two checkpoints of CLUBTAIL's arena, and the return to the title after the final win.
 
 ```sh
 node $H/harness.mjs sim --level 1 --frames 1 --extra $H/fixtures/flow-selftest.js 2>&1 | grep FLOW
@@ -171,3 +172,7 @@ The Lighthouse pilot steers the skiff, turns the mirrors and releases the Storm 
 node $H/harness.mjs sim --level 7 --hero 1 --seed 37
 node $H/harness.mjs sim --level 7 --frames 1 --extra $H/fixtures/lighthouse-check.js
 ```
+
+Mission 8 (DINOSAUR VALLEY) plays with the keyboard bot: `node $H/harness.mjs sim --level 8 --seed 1`. Its
+`hitsBySection` has 6 entries (the fourth is the chase on TOPS: hits there cost her pips, not hearts). Three test
+players, the reference numbers and what the bot's constant hopping does to them: `tools/m8/notes.md`.
